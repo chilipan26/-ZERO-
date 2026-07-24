@@ -118,6 +118,29 @@ background: var(--line); color: var(--ink-sub); margin-right: 5px;
 .item-col { flex: 1; display: flex; flex-direction: column; gap: 1px; font-size: 11px; color: var(--ink-sub); min-width: 0; }
 .item-col .v { color: var(--ink); font-weight: 600; }
 
+.item-check-col { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 0 0 auto; }
+.edit-btn {
+font-size: 9.5px; font-weight: 700; color: var(--ink-sub);
+background: var(--surface); border: 1px solid var(--line); border-radius: 6px;
+padding: 3px 5px; cursor: pointer; white-space: nowrap;
+}
+
+.item-card.editing { flex-direction: column; align-items: stretch; }
+.edit-grid {
+display: grid; grid-template-columns: 1fr 1fr; gap: 6px 8px; margin-bottom: 8px;
+}
+.edit-grid label { font-size: 10px; color: var(--ink-sub); font-weight: 600; display: block; }
+.edit-grid input {
+width: 100%; margin-top: 2px; padding: 6px 7px; font-size: 12px;
+border: 1px solid var(--line); border-radius: 6px; font-family: inherit; color: var(--ink);
+}
+.edit-actions { display: flex; gap: 6px; }
+.edit-actions button {
+flex: 1; padding: 9px; font-size: 12px; font-weight: 700; border-radius: 7px; cursor: pointer;
+}
+.edit-cancel { background: var(--surface); border: 1px solid var(--line); color: var(--ink-sub); }
+.edit-save { background: var(--ink); border: 1px solid var(--ink); color: #fff; }
+
 .empty-msg {
 grid-column: 1 / -1;
 font-size: 13px; color: var(--ink-sub); text-align: center; padding: 40px 0;
@@ -178,6 +201,7 @@ let allItems = [];
 let checkFilter = 'all';   // 'all' | 'unchecked' | 'checked'
 let typeFilter  = 'all';   // 'all' | 種別名
 let dayFilter   = new Set(); // 選択中の「日」（空なら全部表示）
+let editingRow  = null; // 現在編集中の行番号
 
 const $ = id => document.getElementById(id);
 const loadingScreen = $('loadingScreen');
@@ -374,8 +398,31 @@ return;
 list.innerHTML = items.map(itemCardHtml).join('');
 updateProgress();
 
-list.querySelectorAll('.item-card').forEach(card => {
+list.querySelectorAll('.item-card:not(.editing)').forEach(card => {
 card.addEventListener('click', () => onToggleItem(card));
+});
+
+list.querySelectorAll('.edit-btn').forEach(btn => {
+btn.addEventListener('click', (ev) => {
+ev.stopPropagation();
+editingRow = btn.dataset.editRow;
+applyFiltersAndRender();
+});
+});
+
+list.querySelectorAll('.edit-cancel').forEach(btn => {
+btn.addEventListener('click', (ev) => {
+ev.stopPropagation();
+editingRow = null;
+applyFiltersAndRender();
+});
+});
+
+list.querySelectorAll('.edit-save').forEach(btn => {
+btn.addEventListener('click', (ev) => {
+ev.stopPropagation();
+saveEdits(btn.dataset.row);
+});
 });
 }
 
@@ -387,9 +434,14 @@ return n.toFixed(2);
 }
 
 function itemCardHtml(item) {
+if (String(item.row) === String(editingRow)) return editCardHtml(item);
+
 return `
 <div class="item-card ${item.checked ? 'checked' : ''}" data-row="${item.row}" data-checked="${item.checked}">
+<div class="item-check-col">
 <div class="item-checkbox ${item.checked ? 'checked' : ''}">✓</div>
+<button class="edit-btn" data-edit-row="${item.row}">✎ 編集</button>
+</div>
 <div class="item-body">
 <div class="item-top">
 <span class="item-project"><span class="item-date">${item.date || ''}</span>${item.project}</span>
@@ -412,6 +464,80 @@ return `
 </div>
 </div>
 </div>`;
+}
+
+function editField(label, field, item) {
+const val = field === 'unitPrice' ? item.unitPrice : (item[field] || '');
+return `<label>${label}<input id="edit-${field}-${item.row}" type="text" value="${String(val).replace(/"/g,'&quot;')}"></label>`;
+}
+
+function editCardHtml(item) {
+return `
+<div class="item-card editing" data-row="${item.row}">
+<div class="item-body" style="width:100%;">
+<div class="edit-grid">
+${editField('日付','date',item)}
+${editField('種別','type',item)}
+${editField('案件名','project',item)}
+${editField('ポジション','position',item)}
+${editField('担当','name',item)}
+${editField('開始','start',item)}
+${editField('終了','end',item)}
+${editField('稼働','hours',item)}
+${editField('数量','qty',item)}
+${editField('単価','unitPrice',item)}
+</div>
+<div class="edit-grid" style="grid-template-columns:1fr;">
+${editField('メモ','memo',item)}
+</div>
+<div class="edit-actions">
+<button class="edit-cancel" data-row="${item.row}">キャンセル</button>
+<button class="edit-save" data-row="${item.row}">保存する</button>
+</div>
+</div>
+</div>`;
+}
+
+async function saveEdits(row) {
+const item = allItems.find(i => String(i.row) === String(row));
+if (!item) { editingRow = null; applyFiltersAndRender(); return; }
+
+const fields = ['date','type','project','position','name','start','end','hours','qty','unitPrice','memo'];
+const edits = {};
+fields.forEach(f => {
+const el = document.getElementById(`edit-${f}-${row}`);
+if (!el) return;
+const newVal = el.value;
+const oldVal = f === 'unitPrice' ? item.unitPrice : (item[f] ?? '');
+if (String(oldVal ?? '') !== String(newVal)) edits[f] = newVal;
+});
+
+editingRow = null;
+
+if (Object.keys(edits).length === 0) {
+applyFiltersAndRender();
+return;
+}
+
+Object.assign(item, edits);
+applyFiltersAndRender();
+
+try {
+await fetch(GAS_URL, {
+method:   'POST',
+redirect: 'follow',
+headers:  { 'Content-Type': 'text/plain;charset=utf-8' },
+body: JSON.stringify({
+uid: lineUserId,
+sheetName: currentMonth,
+row: row,
+action: 'edit',
+edits: edits,
+}),
+});
+} catch(err) {
+console.error('編集保存エラー', err);
+}
 }
 
 async function onToggleItem(card) {
