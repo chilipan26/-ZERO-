@@ -108,7 +108,7 @@ transition: all .1s;
 .item-body { flex: 1; min-width: 0; }
 .item-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 .item-project { font-size: 13px; font-weight: 700; color: var(--ink); }
-.item-date { font-size: 11px; color: var(--ink-sub); font-weight: 600; margin-left: 4px; }
+.item-date { font-size: 11px; color: var(--ink-sub); font-weight: 600; margin-right: 6px; }
 .item-amount { font-size: 13px; font-weight: 700; color: var(--ink); white-space: nowrap; }
 .item-tag {
 font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 20px;
@@ -392,7 +392,7 @@ return `
 <div class="item-checkbox ${item.checked ? 'checked' : ''}">✓</div>
 <div class="item-body">
 <div class="item-top">
-<span class="item-project">${item.project}<span class="item-date">${item.date || ''}</span></span>
+<span class="item-project"><span class="item-date">${item.date || ''}</span>${item.project}</span>
 </div>
 <div class="item-cols">
 <div class="item-col">
