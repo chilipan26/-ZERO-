@@ -47,7 +47,7 @@ color: var(--ink-sub);
 .top-bar .num { color: var(--ink); font-weight: 700; }
 .top-bar .user-name { color: var(--ink-sub); font-weight: 700; white-space: nowrap; }
 .month-select {
-font-size: 11px; font-weight: 700; padding: 3px 4px;
+font-size: 13px; font-weight: 700; padding: 6px 8px;
 border-radius: 6px; border: 1px solid var(--line);
 background: var(--surface); color: var(--ink);
 flex: 0 0 auto;
@@ -58,14 +58,21 @@ flex: 0 0 auto;
 flex: 1; display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden;
 }
 .seg-btn {
-flex: 1; text-align: center; font-size: 10.5px; font-weight: 700; padding: 6px 2px;
+flex: 1; text-align: center; font-size: 10.5px; font-weight: 700; padding: 12px 2px;
 background: var(--surface); color: var(--ink-sub); border: none; cursor: pointer;
 white-space: nowrap;
 }
 .seg-btn.active { background: var(--ink); color: #fff; }
 .seg-btn + .seg-btn { border-left: 1px solid var(--line); }
 
-.day-row { display: flex; gap: 5px; overflow-x: auto; padding-bottom: 2px; }
+.day-row-wrap { display: flex; align-items: center; gap: 6px; }
+.day-reset {
+flex: 0 0 auto; width: 28px; height: 28px; border-radius: 50%;
+display: flex; align-items: center; justify-content: center;
+font-size: 14px; border: 1px solid var(--line); background: var(--surface);
+color: var(--ink-sub); cursor: pointer;
+}
+.day-row { display: flex; flex-wrap: nowrap; gap: 5px; overflow-x: auto; padding-bottom: 2px; flex: 1; min-width: 0; }
 .day-chip {
 flex: 0 0 auto; width: 26px; height: 26px; border-radius: 50%;
 display: flex; align-items: center; justify-content: center;
@@ -155,7 +162,10 @@ border-radius: 50%; animation: spin .7s linear infinite;
 <div class="seg-group" id="typeFilterRow"></div>
 </div>
 
+<div class="day-row-wrap">
+<button class="day-reset" id="dayReset" title="全部表示" aria-label="全部表示">↺</button>
 <div class="day-row" id="dayRow"></div>
+</div>
 
 <div class="item-list" id="itemList">
 <div class="empty-msg">読み込み中…</div>
@@ -281,6 +291,8 @@ btn.addEventListener('click', () => {
 checkFilter = btn.dataset.check;
 document.querySelectorAll('[data-check]').forEach(b => b.classList.remove('active'));
 btn.classList.add('active');
+dayFilter = new Set();
+renderDayRow();
 applyFiltersAndRender();
 });
 });
@@ -298,14 +310,25 @@ btn.addEventListener('click', () => {
 typeFilter = btn.dataset.type;
 document.querySelectorAll('[data-type]').forEach(b => b.classList.remove('active'));
 btn.classList.add('active');
+dayFilter = new Set();
+renderDayRow();
 applyFiltersAndRender();
 });
 });
 }
 
+function getTypeCheckFilteredItems() {
+let items = allItems;
+if (checkFilter === 'unchecked') items = items.filter(i => !i.checked);
+if (checkFilter === 'checked')   items = items.filter(i => i.checked);
+if (typeFilter !== 'all') items = items.filter(i => i.type === typeFilter);
+return items;
+}
+
 function renderDayRow() {
+const source = getTypeCheckFilteredItems();
 const days = Array.from(new Set(
-allItems.map(i => { const p = parseDateParts(i.date); return p ? p.day : null; }).filter(Boolean)
+source.map(i => { const p = parseDateParts(i.date); return p ? p.day : null; }).filter(Boolean)
 )).sort((a, b) => a - b);
 
 $('dayRow').innerHTML = days.map(d =>
@@ -322,11 +345,14 @@ applyFiltersAndRender();
 });
 }
 
+$('dayReset').addEventListener('click', () => {
+dayFilter = new Set();
+renderDayRow();
+applyFiltersAndRender();
+});
+
 function applyFiltersAndRender() {
-let items = allItems;
-if (checkFilter === 'unchecked') items = items.filter(i => !i.checked);
-if (checkFilter === 'checked')   items = items.filter(i => i.checked);
-if (typeFilter !== 'all') items = items.filter(i => i.type === typeFilter);
+let items = getTypeCheckFilteredItems();
 if (dayFilter.size > 0) {
 items = items.filter(i => {
 const p = parseDateParts(i.date);
@@ -363,8 +389,12 @@ return `
 <span class="item-amount">¥${Number(item.amount).toLocaleString()}</span>
 </div>
 <div class="item-lines">
+<span>ポジション：<span class="v">${item.position || '-'}</span></span>
 <span>担当：<span class="v">${item.name || '-'}</span></span>
+<span>開始：<span class="v">${item.start || '-'}</span></span>
+<span>終了：<span class="v">${item.end || '-'}</span></span>
 <span>稼働：<span class="v">${item.hours || '-'}</span></span>
+<span>数量：<span class="v">${item.qty || '-'}</span></span>
 <span>単価：<span class="v">¥${Number(item.unitPrice).toLocaleString()}</span></span>
 <span>メモ：<span class="v">${item.memo || '-'}</span></span>
 </div>
