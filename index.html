@@ -32,10 +32,7 @@ min-height: 100vh;
 main { padding: 10px 8px 32px; max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 8px; }
 
 .top-bar {
-background: var(--surface);
-border: 1px solid var(--line);
-border-radius: 8px;
-padding: 7px 10px;
+padding: 4px 2px;
 display: flex;
 justify-content: space-between;
 align-items: center;
@@ -47,10 +44,10 @@ color: var(--ink-sub);
 .top-bar .num { color: var(--ink); font-weight: 700; }
 .top-bar .user-name { color: var(--ink-sub); font-weight: 700; white-space: nowrap; }
 .month-select {
-font-size: 13px; font-weight: 700; padding: 6px 8px;
+font-size: 13px; font-weight: 700; padding: 8px 10px;
 border-radius: 6px; border: 1px solid var(--line);
 background: var(--surface); color: var(--ink);
-flex: 0 0 auto;
+flex: 1 1 auto; max-width: 140px;
 }
 
 .filter-split { display: flex; gap: 6px; }
@@ -58,7 +55,7 @@ flex: 0 0 auto;
 flex: 1; display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden;
 }
 .seg-btn {
-flex: 1; text-align: center; font-size: 10.5px; font-weight: 700; padding: 12px 2px;
+flex: 1; text-align: center; font-size: 12px; font-weight: 700; padding: 12px 2px;
 background: var(--surface); color: var(--ink-sub); border: none; cursor: pointer;
 white-space: nowrap;
 }
@@ -117,11 +114,9 @@ transition: all .1s;
 font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 20px;
 background: var(--line); color: var(--ink-sub); margin-right: 5px;
 }
-.item-lines {
-display: grid; grid-template-columns: 1fr 1fr;
-gap: 1px 12px; font-size: 11px; color: var(--ink-sub); margin-top: 4px;
-}
-.item-lines .v { color: var(--ink); font-weight: 600; }
+.item-cols { display: flex; gap: 14px; margin-top: 4px; }
+.item-col { flex: 1; display: flex; flex-direction: column; gap: 1px; font-size: 11px; color: var(--ink-sub); min-width: 0; }
+.item-col .v { color: var(--ink); font-weight: 600; }
 
 .empty-msg {
 grid-column: 1 / -1;
@@ -278,7 +273,7 @@ await loadView(select.value);
 
 function renderCheckFilter() {
 const options = [
-{ key: 'all', label: '全' },
+{ key: 'all', label: 'ALL' },
 { key: 'unchecked', label: '未□' },
 { key: 'checked', label: '済✓' },
 ];
@@ -298,11 +293,16 @@ applyFiltersAndRender();
 });
 }
 
+function shortTypeLabel(t) {
+if (t === 'その他人件費') return 'その他';
+return t;
+}
+
 function renderTypeFilter() {
 const types = Array.from(new Set(allItems.map(i => i.type).filter(Boolean)));
 const options = ['all', ...types];
 $('typeFilterRow').innerHTML = options.map(t =>
-`<button class="seg-btn ${typeFilter === t ? 'active' : ''}" data-type="${t}">${t === 'all' ? '全' : t}</button>`
+`<button class="seg-btn ${typeFilter === t ? 'active' : ''}" data-type="${t}">${t === 'all' ? 'ALL' : shortTypeLabel(t)}</button>`
 ).join('');
 
 document.querySelectorAll('[data-type]').forEach(btn => {
@@ -379,24 +379,36 @@ card.addEventListener('click', () => onToggleItem(card));
 });
 }
 
+function fmtHours(h) {
+if (h === '' || h === null || h === undefined) return '-';
+const n = Number(h);
+if (isNaN(n)) return String(h);
+return n.toFixed(2);
+}
+
 function itemCardHtml(item) {
 return `
 <div class="item-card ${item.checked ? 'checked' : ''}" data-row="${item.row}" data-checked="${item.checked}">
 <div class="item-checkbox ${item.checked ? 'checked' : ''}">✓</div>
 <div class="item-body">
 <div class="item-top">
-<span class="item-project"><span class="item-tag">${item.type}</span>${item.project}<span class="item-date">${item.date || ''}</span></span>
-<span class="item-amount">¥${Number(item.amount).toLocaleString()}</span>
+<span class="item-project">${item.project}<span class="item-date">${item.date || ''}</span></span>
 </div>
-<div class="item-lines">
+<div class="item-cols">
+<div class="item-col">
+<span>種別：<span class="v">${item.type || '-'}</span></span>
+<span>数量：<span class="v">${item.qty || '-'}</span></span>
+<span>メモ：<span class="v">${item.memo || '-'}</span></span>
+<span>単価：<span class="v">¥${Number(item.unitPrice).toLocaleString()}</span></span>
+<span>合計：<span class="v">¥${Number(item.amount).toLocaleString()}</span></span>
+</div>
+<div class="item-col">
 <span>ポジション：<span class="v">${item.position || '-'}</span></span>
 <span>担当：<span class="v">${item.name || '-'}</span></span>
 <span>開始：<span class="v">${item.start || '-'}</span></span>
 <span>終了：<span class="v">${item.end || '-'}</span></span>
-<span>稼働：<span class="v">${item.hours || '-'}</span></span>
-<span>数量：<span class="v">${item.qty || '-'}</span></span>
-<span>単価：<span class="v">¥${Number(item.unitPrice).toLocaleString()}</span></span>
-<span>メモ：<span class="v">${item.memo || '-'}</span></span>
+<span>稼働：<span class="v">${fmtHours(item.hours)}</span></span>
+</div>
 </div>
 </div>
 </div>`;
