@@ -35,26 +35,45 @@ main { padding: 10px 8px 32px; max-width: 640px; margin: 0 auto; display: flex; 
 background: var(--surface);
 border: 1px solid var(--line);
 border-radius: 8px;
-padding: 8px 11px;
+padding: 7px 10px;
 display: flex;
 justify-content: space-between;
 align-items: center;
+gap: 8px;
 font-size: 12px;
 font-weight: 600;
 color: var(--ink-sub);
 }
 .top-bar .num { color: var(--ink); font-weight: 700; }
-.top-bar .user-name { color: var(--ink-sub); font-weight: 700; }
-
-.month-tabs, .filter-row { display: flex; gap: 5px; overflow-x: auto; padding-bottom: 2px; }
-.month-btn, .filter-btn {
+.top-bar .user-name { color: var(--ink-sub); font-weight: 700; white-space: nowrap; }
+.month-select {
+font-size: 11px; font-weight: 700; padding: 3px 4px;
+border-radius: 6px; border: 1px solid var(--line);
+background: var(--surface); color: var(--ink);
 flex: 0 0 auto;
-font-size: 11.5px; font-weight: 700; padding: 5px 11px;
-border-radius: 20px; border: 1px solid var(--line);
-background: var(--surface); color: var(--ink-sub);
-cursor: pointer; white-space: nowrap;
 }
-.month-btn.active, .filter-btn.active { background: var(--ink); border-color: var(--ink); color: #fff; }
+
+.filter-split { display: flex; gap: 6px; }
+.seg-group {
+flex: 1; display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden;
+}
+.seg-btn {
+flex: 1; text-align: center; font-size: 10.5px; font-weight: 700; padding: 6px 2px;
+background: var(--surface); color: var(--ink-sub); border: none; cursor: pointer;
+white-space: nowrap;
+}
+.seg-btn.active { background: var(--ink); color: #fff; }
+.seg-btn + .seg-btn { border-left: 1px solid var(--line); }
+
+.day-row { display: flex; gap: 5px; overflow-x: auto; padding-bottom: 2px; }
+.day-chip {
+flex: 0 0 auto; width: 26px; height: 26px; border-radius: 50%;
+display: flex; align-items: center; justify-content: center;
+font-size: 10.5px; font-weight: 700;
+border: 1px solid var(--line); background: var(--surface); color: var(--ink-sub);
+cursor: pointer;
+}
+.day-chip.active { background: var(--ink); border-color: var(--ink); color: #fff; }
 
 .item-list {
 display: flex; flex-direction: column; gap: 6px;
@@ -126,13 +145,17 @@ border-radius: 50%; animation: spin .7s linear infinite;
 
 <main id="mainWrap" style="display:none;">
 <div class="top-bar">
+<select class="month-select" id="monthSelect"></select>
 <span>確認状況　<span class="num" id="checkedCount">0</span> / <span id="totalCount">0</span> 件</span>
 <span class="user-name" id="loginName">-</span>
 </div>
 
-<div class="month-tabs" id="monthTabs"></div>
-<div class="filter-row" id="checkFilterRow"></div>
-<div class="filter-row" id="typeFilterRow"></div>
+<div class="filter-split">
+<div class="seg-group" id="checkFilterRow"></div>
+<div class="seg-group" id="typeFilterRow"></div>
+</div>
+
+<div class="day-row" id="dayRow"></div>
 
 <div class="item-list" id="itemList">
 <div class="empty-msg">読み込み中…</div>
@@ -149,6 +172,7 @@ let currentMonth = '';
 let allItems = [];
 let checkFilter = 'all';   // 'all' | 'unchecked' | 'checked'
 let typeFilter  = 'all';   // 'all' | 種別名
+let dayFilter   = new Set(); // 選択中の「日」（空なら全部表示）
 
 const $ = id => document.getElementById(id);
 const loadingScreen = $('loadingScreen');
@@ -186,9 +210,10 @@ return;
 }
 
 if (!data.hasInvoice) {
-$('monthTabs').innerHTML = '';
+$('monthSelect').innerHTML = '';
 $('checkFilterRow').innerHTML = '';
 $('typeFilterRow').innerHTML = '';
+$('dayRow').innerHTML = '';
 $('itemList').innerHTML = `<div class="empty-msg">${data.reason || 'まだ請求書が用意されていません'}</div>`;
 $('checkedCount').textContent = '0';
 $('totalCount').textContent = '0';
@@ -197,9 +222,11 @@ return;
 
 currentMonth = data.selectedMonth;
 allItems = sortByDate(data.items || []);
-renderMonthTabs(data.months, data.selectedMonth);
+dayFilter = new Set();
+renderMonthSelect(data.months, data.selectedMonth);
 renderCheckFilter();
 renderTypeFilter();
+renderDayRow();
 applyFiltersAndRender();
 } catch(err) {
 console.error('loadViewエラー', err);
@@ -207,41 +234,46 @@ $('itemList').innerHTML = '<div class="empty-msg">読み込みに失敗しまし
 }
 }
 
-// 日付「6/4(木)」形式から並び替え用キーを作る
+// 日付「2026/07/01」「6/4」どちらの形式にも対応して {month, day} を取り出す
+function parseDateParts(dateStr) {
+const s = String(dateStr || '');
+let m = s.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})/);
+if (m) return { month: Number(m[2]), day: Number(m[3]) };
+m = s.match(/^(\d{1,2})\/(\d{1,2})/);
+if (m) return { month: Number(m[1]), day: Number(m[2]) };
+return null;
+}
+
 function dateSortKey(dateStr) {
-const m = String(dateStr || '').match(/^(\d{1,2})\/(\d{1,2})/);
-if (!m) return 999999;
-return Number(m[1]) * 100 + Number(m[2]);
+const p = parseDateParts(dateStr);
+if (!p) return 999999;
+return p.month * 100 + p.day;
 }
 
 function sortByDate(items) {
 return items.slice().sort((a, b) => dateSortKey(a.date) - dateSortKey(b.date));
 }
 
-function renderMonthTabs(months, selected) {
-$('monthTabs').innerHTML = months.map(m =>
-`<button class="month-btn ${m === selected ? 'active' : ''}" data-month="${m}">${m}</button>`
+function renderMonthSelect(months, selected) {
+const select = $('monthSelect');
+select.innerHTML = months.map(m =>
+`<option value="${m}" ${m === selected ? 'selected' : ''}>${m}</option>`
 ).join('');
 
-document.querySelectorAll('.month-btn').forEach(btn => {
-btn.addEventListener('click', async () => {
-if (btn.dataset.month === currentMonth) return;
-document.querySelectorAll('.month-btn').forEach(b => b.classList.remove('active'));
-btn.classList.add('active');
+select.onchange = async () => {
 $('itemList').innerHTML = '<div class="empty-msg">読み込み中…</div>';
-await loadView(btn.dataset.month);
-});
-});
+await loadView(select.value);
+};
 }
 
 function renderCheckFilter() {
 const options = [
-{ key: 'all', label: '全部' },
-{ key: 'unchecked', label: '未チェック' },
-{ key: 'checked', label: 'チェック済み' },
+{ key: 'all', label: '全' },
+{ key: 'unchecked', label: '未□' },
+{ key: 'checked', label: '済✓' },
 ];
 $('checkFilterRow').innerHTML = options.map(o =>
-`<button class="filter-btn ${checkFilter === o.key ? 'active' : ''}" data-check="${o.key}">${o.label}</button>`
+`<button class="seg-btn ${checkFilter === o.key ? 'active' : ''}" data-check="${o.key}">${o.label}</button>`
 ).join('');
 
 document.querySelectorAll('[data-check]').forEach(btn => {
@@ -258,7 +290,7 @@ function renderTypeFilter() {
 const types = Array.from(new Set(allItems.map(i => i.type).filter(Boolean)));
 const options = ['all', ...types];
 $('typeFilterRow').innerHTML = options.map(t =>
-`<button class="filter-btn ${typeFilter === t ? 'active' : ''}" data-type="${t}">${t === 'all' ? '全種別' : t}</button>`
+`<button class="seg-btn ${typeFilter === t ? 'active' : ''}" data-type="${t}">${t === 'all' ? '全' : t}</button>`
 ).join('');
 
 document.querySelectorAll('[data-type]').forEach(btn => {
@@ -271,11 +303,36 @@ applyFiltersAndRender();
 });
 }
 
+function renderDayRow() {
+const days = Array.from(new Set(
+allItems.map(i => { const p = parseDateParts(i.date); return p ? p.day : null; }).filter(Boolean)
+)).sort((a, b) => a - b);
+
+$('dayRow').innerHTML = days.map(d =>
+`<span class="day-chip ${dayFilter.has(d) ? 'active' : ''}" data-day="${d}">${d}</span>`
+).join('');
+
+document.querySelectorAll('.day-chip').forEach(chip => {
+chip.addEventListener('click', () => {
+const d = Number(chip.dataset.day);
+if (dayFilter.has(d)) dayFilter.delete(d); else dayFilter.add(d);
+chip.classList.toggle('active');
+applyFiltersAndRender();
+});
+});
+}
+
 function applyFiltersAndRender() {
 let items = allItems;
 if (checkFilter === 'unchecked') items = items.filter(i => !i.checked);
 if (checkFilter === 'checked')   items = items.filter(i => i.checked);
 if (typeFilter !== 'all') items = items.filter(i => i.type === typeFilter);
+if (dayFilter.size > 0) {
+items = items.filter(i => {
+const p = parseDateParts(i.date);
+return p && dayFilter.has(p.day);
+});
+}
 renderItems(items);
 }
 
