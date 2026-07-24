@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>請求書チェック</title>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+--ink:       #1c1c1c;
+--ink-sub:   #6e6e6e;
+--surface:   #ffffff;
+--bg:        #f0f0ef;
+--line:      #dcdcdc;
+--accent:    #333333;
+--ok:        #2ec4b6;
+--ng:        #e63946;
+--radius:    10px;
+}
+
+html, body {
+background: var(--bg);
+color: var(--ink);
+font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif;
+font-size: 14px;
+min-height: 100vh;
+-webkit-tap-highlight-color: transparent;
+}
+
+main { padding: 10px 8px 32px; max-width: 520px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
+
+.login-badge {
+background: var(--surface);
+border: 1px solid var(--line);
+border-radius: 8px;
+padding: 7px 11px;
+display: flex;
+align-items: center;
+gap: 6px;
+font-size: 12px;
+font-weight: 600;
+color: var(--ink-sub);
+}
+
+.month-tabs { display: flex; gap: 5px; overflow-x: auto; padding-bottom: 2px; }
+.month-btn {
+flex: 0 0 auto;
+font-size: 12px; font-weight: 700; padding: 6px 12px;
+border-radius: 20px; border: 1px solid var(--line);
+background: var(--surface); color: var(--ink-sub);
+cursor: pointer; white-space: nowrap;
+}
+.month-btn.active { background: var(--ink); border-color: var(--ink); color: #fff; }
+
+.progress-bar {
+background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+padding: 9px 12px; font-size: 12px; color: var(--ink-sub); font-weight: 600;
+display: flex; justify-content: space-between; align-items: center;
+}
+.progress-bar .num { color: var(--ink); font-weight: 700; }
+
+.item-list { display: flex; flex-direction: column; gap: 6px; }
+
+.item-card {
+background: var(--surface);
+border: 0.5px solid var(--line);
+border-radius: 8px;
+padding: 9px 10px;
+display: flex;
+gap: 10px;
+align-items: flex-start;
+}
+.item-card.checked { background: #eef7f6; border-color: #bfe6e2; }
+
+.item-checkbox {
+width: 24px; height: 24px; flex: 0 0 24px;
+border: 1.5px solid var(--line); border-radius: 6px;
+background: var(--surface);
+display: flex; align-items: center; justify-content: center;
+font-size: 15px; color: transparent;
+cursor: pointer; margin-top: 1px;
+transition: all .1s;
+}
+.item-checkbox.checked { background: var(--ok); border-color: var(--ok); color: #fff; }
+
+.item-body { flex: 1; min-width: 0; }
+.item-top { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
+.item-project { font-size: 13px; font-weight: 700; color: var(--ink); }
+.item-amount { font-size: 13px; font-weight: 700; color: var(--ink); white-space: nowrap; }
+.item-tag {
+font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 20px;
+background: var(--line); color: var(--ink-sub); margin-right: 5px;
+}
+.item-grid {
+display: grid; grid-template-columns: repeat(2, 1fr);
+gap: 1px 8px; font-size: 11px; color: var(--ink-sub); margin-top: 4px;
+}
+.item-grid .k { font-weight: 600; }
+.item-grid .v { color: var(--ink); font-weight: 600; }
+
+.empty-msg {
+font-size: 13px; color: var(--ink-sub); text-align: center; padding: 40px 0;
+}
+
+#loadingScreen {
+position: fixed; inset: 0; background: var(--bg);
+display: flex; align-items: center; justify-content: center;
+z-index: 100; flex-direction: column; gap: 14px;
+}
+#loadingScreen.hidden { display: none; }
+.spinner {
+width: 32px; height: 32px;
+border: 3px solid var(--line); border-top-color: var(--accent);
+border-radius: 50%; animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text { font-size: 13px; color: var(--ink-sub); }
+</style>
+</head>
+<body>
+
+<div id="loadingScreen">
+<div class="spinner"></div>
+<div class="loading-text">読み込み中…</div>
+</div>
+
+<main id="mainWrap" style="display:none;">
+<div class="login-badge">
+<span>👤</span>
+<span id="loginName">読み込み中…</span>
+</div>
+
+<div class="month-tabs" id="monthTabs"></div>
+
+<div class="progress-bar">
+<span>確認状況</span>
+<span><span class="num" id="checkedCount">0</span> / <span id="totalCount">0</span> 件</span>
+</div>
+
+<div class="item-list" id="itemList">
+<div class="empty-msg">読み込み中…</div>
+</div>
+</main>
+
+<script>
+const LIFF_ID = '2010311386-sSwMJRkO';
+const GAS_URL = 'GAS_DEPLOY_URL_ここに請求書チェックGASのデプロイURLを入れてください';
+
+let lineUserId = '';
+let displayName = '';
+let currentMonth = '';
+
+const $ = id => document.getElementById(id);
+const loadingScreen = $('loadingScreen');
+const mainWrap       = $('mainWrap');
+
+(async () => {
+try {
+await liff.init({ liffId: LIFF_ID });
+if (!liff.isLoggedIn()) { liff.login(); return; }
+const profile = await liff.getProfile();
+lineUserId  = profile.userId;
+displayName = profile.displayName;
+} catch(e) {
+console.error('LIFF init error:', e);
+lineUserId  = 'debug_user';
+displayName = 'デバッグユーザー';
+}
+$('loginName').textContent = displayName + ' としてログイン中';
+
+await loadView();
+loadingScreen.classList.add('hidden');
+mainWrap.style.display = 'flex';
+mainWrap.style.flexDirection = 'column';
+})();
+
+async function loadView(month) {
+try {
+const url = `${GAS_URL}?mode=view&uid=${encodeURIComponent(lineUserId)}` + (month ? `&sheetName=${encodeURIComponent(month)}` : '');
+const res  = await fetch(url);
+const data = await res.json();
+
+if (data.status !== 'ok') {
+$('itemList').innerHTML = '<div class="empty-msg">読み込みに失敗しました</div>';
+return;
+}
+
+if (!data.hasInvoice) {
+$('monthTabs').innerHTML = '';
+$('itemList').innerHTML = `<div class="empty-msg">${data.reason || 'まだ請求書が用意されていません'}</div>`;
+$('checkedCount').textContent = '0';
+$('totalCount').textContent = '0';
+return;
+}
+
+currentMonth = data.selectedMonth;
+renderMonthTabs(data.months, data.selectedMonth);
+renderItems(data.items);
+} catch(err) {
+console.error('loadViewエラー', err);
+$('itemList').innerHTML = '<div class="empty-msg">読み込みに失敗しました</div>';
+}
+}
+
+function renderMonthTabs(months, selected) {
+$('monthTabs').innerHTML = months.map(m =>
+`<button class="month-btn ${m === selected ? 'active' : ''}" data-month="${m}">${m}</button>`
+).join('');
+
+document.querySelectorAll('.month-btn').forEach(btn => {
+btn.addEventListener('click', async () => {
+if (btn.dataset.month === currentMonth) return;
+document.querySelectorAll('.month-btn').forEach(b => b.classList.remove('active'));
+btn.classList.add('active');
+$('itemList').innerHTML = '<div class="empty-msg">読み込み中…</div>';
+await loadView(btn.dataset.month);
+});
+});
+}
+
+function renderItems(items) {
+const list = $('itemList');
+
+if (!items || items.length === 0) {
+list.innerHTML = '<div class="empty-msg">この月の明細はありません</div>';
+$('checkedCount').textContent = '0';
+$('totalCount').textContent = '0';
+return;
+}
+
+list.innerHTML = items.map(itemCardHtml).join('');
+updateProgress(items);
+
+list.querySelectorAll('.item-card').forEach(card => {
+card.addEventListener('click', () => onToggleItem(card));
+});
+}
+
+function itemCardHtml(item) {
+return `
+<div class="item-card ${item.checked ? 'checked' : ''}" data-row="${item.row}" data-checked="${item.checked}">
+<div class="item-checkbox ${item.checked ? 'checked' : ''}">✓</div>
+<div class="item-body">
+<div class="item-top">
+<span class="item-project"><span class="item-tag">${item.type}</span>${item.project}${item.date ? '（' + item.date + '）' : ''}</span>
+<span class="item-amount">¥${Number(item.amount).toLocaleString()}</span>
+</div>
+<div class="item-grid">
+<span class="k">担当</span><span class="v">${item.name || '-'}</span>
+<span class="k">単価</span><span class="v">¥${Number(item.unitPrice).toLocaleString()}</span>
+<span class="k">数量</span><span class="v">${item.qty || '-'}</span>
+<span class="k">メモ</span><span class="v">${item.memo || '-'}</span>
+</div>
+</div>
+</div>`;
+}
+
+async function onToggleItem(card) {
+const row = card.dataset.row;
+const nextChecked = card.dataset.checked !== 'true';
+
+// 楽観的UI更新
+card.dataset.checked = nextChecked;
+card.classList.toggle('checked', nextChecked);
+card.querySelector('.item-checkbox').classList.toggle('checked', nextChecked);
+updateProgressFromDom();
+
+try {
+await fetch(GAS_URL, {
+method:   'POST',
+redirect: 'follow',
+headers:  { 'Content-Type': 'text/plain;charset=utf-8' },
+body: JSON.stringify({
+uid: lineUserId,
+sheetName: currentMonth,
+row: row,
+checked: nextChecked,
+}),
+});
+} catch(err) {
+console.error('チェック更新エラー', err);
+// 失敗時はロールバック
+card.dataset.checked = !nextChecked;
+card.classList.toggle('checked', !nextChecked);
+card.querySelector('.item-checkbox').classList.toggle('checked', !nextChecked);
+updateProgressFromDom();
+}
+}
+
+function updateProgress(items) {
+const checked = items.filter(i => i.checked).length;
+$('checkedCount').textContent = checked;
+$('totalCount').textContent = items.length;
+}
+
+function updateProgressFromDom() {
+const cards = document.querySelectorAll('.item-card');
+const total = cards.length;
+let checked = 0;
+cards.forEach(c => { if (c.dataset.checked === 'true') checked++; });
+$('checkedCount').textContent = checked;
+$('totalCount').textContent = total;
+}
+</script>
+</body>
+</html>
