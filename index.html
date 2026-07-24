@@ -396,18 +396,18 @@ return `
 </div>
 <div class="item-cols">
 <div class="item-col">
-<span>種別：<span class="v">${item.type || '-'}</span></span>
-<span>数量：<span class="v">${item.qty || '-'}</span></span>
-<span>メモ：<span class="v">${item.memo || '-'}</span></span>
-<span>単価：<span class="v">¥${Number(item.unitPrice).toLocaleString()}</span></span>
-<span>合計：<span class="v">¥${Number(item.amount).toLocaleString()}</span></span>
-</div>
-<div class="item-col">
 <span>ポジション：<span class="v">${item.position || '-'}</span></span>
 <span>担当：<span class="v">${item.name || '-'}</span></span>
 <span>開始：<span class="v">${item.start || '-'}</span></span>
 <span>終了：<span class="v">${item.end || '-'}</span></span>
 <span>稼働：<span class="v">${fmtHours(item.hours)}</span></span>
+</div>
+<div class="item-col">
+<span>種別：<span class="v">${item.type || '-'}</span></span>
+<span>数量：<span class="v">${item.qty || '-'}</span></span>
+<span>メモ：<span class="v">${item.memo || '-'}</span></span>
+<span>単価：<span class="v">¥${Number(item.unitPrice).toLocaleString()}</span></span>
+<span>合計：<span class="v">¥${Number(item.amount).toLocaleString()}</span></span>
 </div>
 </div>
 </div>
