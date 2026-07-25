@@ -89,10 +89,11 @@ border: 0.5px solid var(--line);
 border-radius: 8px;
 padding: 9px 10px;
 display: flex;
-gap: 9px;
-align-items: flex-start;
+flex-direction: column;
+gap: 6px;
 }
 .item-card.checked { background: #eef7f6; border-color: #bfe6e2; }
+.item-main-row { display: flex; gap: 9px; align-items: flex-start; }
 
 .item-checkbox {
 width: 22px; height: 22px; flex: 0 0 22px;
@@ -104,6 +105,14 @@ cursor: pointer; margin-top: 1px;
 transition: all .1s;
 }
 .item-checkbox.checked { background: var(--ok); border-color: var(--ok); color: #fff; }
+
+.item-edit-row { display: flex; justify-content: flex-end; }
+.edit-icon-btn {
+width: 26px; height: 26px; border-radius: 50%;
+display: flex; align-items: center; justify-content: center;
+font-size: 12px; color: var(--ink-sub);
+background: var(--surface); border: 1px solid var(--line); cursor: pointer;
+}
 
 .item-body { flex: 1; min-width: 0; }
 .item-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
@@ -117,13 +126,6 @@ background: var(--line); color: var(--ink-sub); margin-right: 5px;
 .item-cols { display: flex; gap: 14px; margin-top: 4px; }
 .item-col { flex: 1; display: flex; flex-direction: column; gap: 1px; font-size: 11px; color: var(--ink-sub); min-width: 0; }
 .item-col .v { color: var(--ink); font-weight: 600; }
-
-.item-check-col { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 0 0 auto; }
-.edit-btn {
-font-size: 9.5px; font-weight: 700; color: var(--ink-sub);
-background: var(--surface); border: 1px solid var(--line); border-radius: 6px;
-padding: 3px 5px; cursor: pointer; white-space: nowrap;
-}
 
 .item-card.editing { flex-direction: column; align-items: stretch; }
 .edit-grid {
@@ -269,9 +271,9 @@ $('itemList').innerHTML = '<div class="empty-msg">読み込みに失敗しまし
 function parseDateParts(dateStr) {
 const s = String(dateStr || '');
 let m = s.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})/);
-if (m) return { month: Number(m[2]), day: Number(m[3]) };
+if (m) return { year: Number(m[1]), month: Number(m[2]), day: Number(m[3]) };
 m = s.match(/^(\d{1,2})\/(\d{1,2})/);
-if (m) return { month: Number(m[1]), day: Number(m[2]) };
+if (m) return { year: null, month: Number(m[1]), day: Number(m[2]) };
 return null;
 }
 
@@ -411,7 +413,7 @@ list.querySelectorAll('.item-card:not(.editing)').forEach(card => {
 card.addEventListener('click', () => onToggleItem(card));
 });
 
-list.querySelectorAll('.edit-btn').forEach(btn => {
+list.querySelectorAll('.edit-icon-btn').forEach(btn => {
 btn.addEventListener('click', (ev) => {
 ev.stopPropagation();
 editingRow = btn.dataset.editRow;
@@ -448,6 +450,22 @@ saveNewItem();
 });
 }
 
+const WEEKDAY_JP = ['日','月','火','水','木','金','土'];
+function pad2(n) { return String(n).padStart(2, '0'); }
+
+function fmtDateWithWeekday(dateStr) {
+const p = parseDateParts(dateStr);
+if (!p) return dateStr || '';
+let year = p.year;
+if (!year && currentMonth) {
+const m = String(currentMonth).match(/^(\d{4})\./);
+if (m) year = Number(m[1]);
+}
+if (!year) return `${pad2(p.month)}/${pad2(p.day)}`;
+const d = new Date(year, p.month - 1, p.day);
+return `${pad2(p.month)}/${pad2(p.day)}(${WEEKDAY_JP[d.getDay()]})`;
+}
+
 function fmtHours(h) {
 if (h === '' || h === null || h === undefined) return '-';
 const n = Number(h);
@@ -460,13 +478,11 @@ if (String(item.row) === String(editingRow)) return editCardHtml(item);
 
 return `
 <div class="item-card ${item.checked ? 'checked' : ''}" data-row="${item.row}" data-checked="${item.checked}">
-<div class="item-check-col">
+<div class="item-main-row">
 <div class="item-checkbox ${item.checked ? 'checked' : ''}">✓</div>
-<button class="edit-btn" data-edit-row="${item.row}">✎ 編集</button>
-</div>
 <div class="item-body">
 <div class="item-top">
-<span class="item-project"><span class="item-date">${item.date || ''}</span>${item.project}</span>
+<span class="item-project"><span class="item-date">${fmtDateWithWeekday(item.date)}</span>${item.project}</span>
 </div>
 <div class="item-cols">
 <div class="item-col">
@@ -484,6 +500,10 @@ return `
 <span>合計：<span class="v">¥${Number(item.amount).toLocaleString()}</span></span>
 </div>
 </div>
+</div>
+</div>
+<div class="item-edit-row">
+<button class="edit-icon-btn" data-edit-row="${item.row}">✎</button>
 </div>
 </div>`;
 }
