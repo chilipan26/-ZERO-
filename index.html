@@ -181,6 +181,7 @@ border-radius: 50%; animation: spin .7s linear infinite;
 </div>
 
 <div class="day-row-wrap">
+<button class="day-reset" id="addItemBtn" title="新規追加" aria-label="新規追加">＋</button>
 <button class="day-reset" id="dayReset" title="全部表示" aria-label="全部表示">↺</button>
 <div class="day-row" id="dayRow"></div>
 </div>
@@ -202,6 +203,7 @@ let checkFilter = 'all';   // 'all' | 'unchecked' | 'checked'
 let typeFilter  = 'all';   // 'all' | 種別名
 let dayFilter   = new Set(); // 選択中の「日」（空なら全部表示）
 let editingRow  = null; // 現在編集中の行番号
+let addMode     = false; // 新規追加フォームを開いているか
 
 const $ = id => document.getElementById(id);
 const loadingScreen = $('loadingScreen');
@@ -375,6 +377,11 @@ renderDayRow();
 applyFiltersAndRender();
 });
 
+$('addItemBtn').addEventListener('click', () => {
+addMode = !addMode;
+applyFiltersAndRender();
+});
+
 function applyFiltersAndRender() {
 let items = getTypeCheckFilteredItems();
 if (dayFilter.size > 0) {
@@ -389,13 +396,15 @@ renderItems(items);
 function renderItems(items) {
 const list = $('itemList');
 
-if (!items || items.length === 0) {
+const addHtml = addMode ? addCardHtml() : '';
+
+if ((!items || items.length === 0) && !addMode) {
 list.innerHTML = '<div class="empty-msg">該当する明細はありません</div>';
 updateProgress();
 return;
 }
 
-list.innerHTML = items.map(itemCardHtml).join('');
+list.innerHTML = addHtml + (items && items.length ? items.map(itemCardHtml).join('') : '');
 updateProgress();
 
 list.querySelectorAll('.item-card:not(.editing)').forEach(card => {
@@ -423,6 +432,19 @@ btn.addEventListener('click', (ev) => {
 ev.stopPropagation();
 saveEdits(btn.dataset.row);
 });
+});
+
+const addCancelBtn = $('addCancelBtn');
+if (addCancelBtn) addCancelBtn.addEventListener('click', (ev) => {
+ev.stopPropagation();
+addMode = false;
+applyFiltersAndRender();
+});
+
+const addSaveBtn = $('addSaveBtn');
+if (addSaveBtn) addSaveBtn.addEventListener('click', (ev) => {
+ev.stopPropagation();
+saveNewItem();
 });
 }
 
@@ -573,6 +595,63 @@ card.querySelector('.item-checkbox').classList.toggle('checked', !nextChecked);
 if (target) target.checked = !nextChecked;
 updateProgress();
 }
+}
+
+function addCardHtml() {
+return `
+<div class="item-card editing" id="addCard">
+<div class="item-body" style="width:100%;">
+<div class="edit-grid">
+<label>日付<input id="new-date" type="text" placeholder="6/4(木)"></label>
+<label>種別<input id="new-type" type="text" placeholder="人件費"></label>
+<label>案件名<input id="new-project" type="text"></label>
+<label>ポジション<input id="new-position" type="text"></label>
+<label>担当<input id="new-name" type="text" value="${displayName || ''}"></label>
+<label>開始<input id="new-start" type="text"></label>
+<label>終了<input id="new-end" type="text"></label>
+<label>稼働<input id="new-hours" type="text"></label>
+<label>数量<input id="new-qty" type="text" value="1"></label>
+<label>単価<input id="new-unitPrice" type="text"></label>
+</div>
+<div class="edit-grid" style="grid-template-columns:1fr;">
+<label>メモ<input id="new-memo" type="text"></label>
+</div>
+<div class="edit-actions">
+<button class="edit-cancel" id="addCancelBtn">キャンセル</button>
+<button class="edit-save" id="addSaveBtn">保存する</button>
+</div>
+</div>
+</div>`;
+}
+
+async function saveNewItem() {
+const fields = ['date','type','project','position','name','start','end','hours','qty','unitPrice','memo'];
+const data = {};
+fields.forEach(f => {
+const el = document.getElementById(`new-${f}`);
+if (el) data[f] = el.value;
+});
+
+addMode = false;
+$('itemList').innerHTML = '<div class="empty-msg">保存中…</div>';
+
+try {
+await fetch(GAS_URL, {
+method:   'POST',
+redirect: 'follow',
+headers:  { 'Content-Type': 'text/plain;charset=utf-8' },
+body: JSON.stringify({
+uid: lineUserId,
+sheetName: currentMonth,
+action: 'add',
+data: data,
+}),
+});
+} catch(err) {
+console.error('新規追加エラー', err);
+}
+
+await loadView(currentMonth);
 }
 
 function updateProgress() {
