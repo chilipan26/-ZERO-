@@ -31,6 +31,14 @@ min-height: 100vh;
 
 main { padding: 10px 8px 32px; max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 8px; }
 
+.sticky-header {
+position: sticky; top: 0; z-index: 20;
+background: var(--bg);
+padding-top: 10px; padding-bottom: 6px;
+display: flex; flex-direction: column; gap: 8px;
+margin: -10px -8px 0; padding-left: 8px; padding-right: 8px;
+}
+
 .top-bar {
 padding: 4px 2px;
 display: flex;
@@ -55,12 +63,18 @@ flex: 1 1 auto; max-width: 140px;
 flex: 1; display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden;
 }
 .seg-btn {
-flex: 1; text-align: center; font-size: 12px; font-weight: 700; padding: 12px 2px;
+flex: 1; text-align: center; font-size: 11px; font-weight: 700; padding: 7px 2px;
 background: var(--surface); color: var(--ink-sub); border: none; cursor: pointer;
 white-space: nowrap;
 }
 .seg-btn.active { background: var(--ink); color: #fff; }
 .seg-btn + .seg-btn { border-left: 1px solid var(--line); }
+
+.bulk-check-btn {
+width: 100%; padding: 9px; font-size: 12px; font-weight: 700;
+border-radius: 8px; border: 1px solid var(--line); background: var(--surface);
+color: var(--ink-sub); cursor: pointer;
+}
 
 .day-row-wrap { display: flex; align-items: center; gap: 6px; }
 .day-reset {
@@ -87,10 +101,11 @@ display: flex; flex-direction: column; gap: 6px;
 background: var(--surface);
 border: 0.5px solid var(--line);
 border-radius: 8px;
-padding: 9px 10px;
+padding: 9px 10px 34px;
 display: flex;
 flex-direction: column;
 gap: 6px;
+position: relative;
 }
 .item-card.checked { background: #eef7f6; border-color: #bfe6e2; }
 .item-main-row { display: flex; gap: 9px; align-items: flex-start; }
@@ -106,8 +121,8 @@ transition: all .1s;
 }
 .item-checkbox.checked { background: var(--ok); border-color: var(--ok); color: #fff; }
 
-.item-edit-row { display: flex; justify-content: flex-end; }
 .edit-icon-btn {
+position: absolute; left: 8px; bottom: 8px;
 width: 26px; height: 26px; border-radius: 50%;
 display: flex; align-items: center; justify-content: center;
 font-size: 12px; color: var(--ink-sub);
@@ -171,6 +186,7 @@ border-radius: 50%; animation: spin .7s linear infinite;
 </div>
 
 <main id="mainWrap" style="display:none;">
+<div class="sticky-header">
 <div class="top-bar">
 <select class="month-select" id="monthSelect"></select>
 <span>確認状況　<span class="num" id="checkedCount">0</span> / <span id="totalCount">0</span> 件</span>
@@ -186,6 +202,9 @@ border-radius: 50%; animation: spin .7s linear infinite;
 <button class="day-reset" id="addItemBtn" title="新規追加" aria-label="新規追加">＋</button>
 <button class="day-reset" id="dayReset" title="全部表示" aria-label="全部表示">↺</button>
 <div class="day-row" id="dayRow"></div>
+</div>
+
+<button class="bulk-check-btn" id="bulkCheckBtn">☑ 表示中を全てチェック</button>
 </div>
 
 <div class="item-list" id="itemList">
@@ -384,7 +403,9 @@ addMode = !addMode;
 applyFiltersAndRender();
 });
 
-function applyFiltersAndRender() {
+$('bulkCheckBtn').addEventListener('click', () => bulkCheckVisible());
+
+function getFilteredItems() {
 let items = getTypeCheckFilteredItems();
 if (dayFilter.size > 0) {
 items = items.filter(i => {
@@ -392,7 +413,35 @@ const p = parseDateParts(i.date);
 return p && dayFilter.has(p.day);
 });
 }
-renderItems(items);
+return items;
+}
+
+function applyFiltersAndRender() {
+renderItems(getFilteredItems());
+}
+
+async function bulkCheckVisible() {
+const visible = getFilteredItems().filter(i => !i.checked);
+if (visible.length === 0) return;
+
+visible.forEach(i => { i.checked = true; });
+applyFiltersAndRender();
+
+try {
+await Promise.all(visible.map(i => fetch(GAS_URL, {
+method:   'POST',
+redirect: 'follow',
+headers:  { 'Content-Type': 'text/plain;charset=utf-8' },
+body: JSON.stringify({
+uid: lineUserId,
+sheetName: currentMonth,
+row: i.row,
+checked: true,
+}),
+})));
+} catch(err) {
+console.error('まとめてチェックエラー', err);
+}
 }
 
 function renderItems(items) {
@@ -502,9 +551,7 @@ return `
 </div>
 </div>
 </div>
-<div class="item-edit-row">
 <button class="edit-icon-btn" data-edit-row="${item.row}">✎</button>
-</div>
 </div>`;
 }
 
