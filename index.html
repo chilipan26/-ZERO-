@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>前日確認</title>
+<title>請求書チェック</title>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -15,7 +15,6 @@
 --bg:        #f0f0ef;
 --line:      #dcdcdc;
 --accent:    #333333;
---accent-dk: #000000;
 --ok:        #2ec4b6;
 --ng:        #e63946;
 --radius:    10px;
@@ -30,197 +29,150 @@ min-height: 100vh;
 -webkit-tap-highlight-color: transparent;
 }
 
-main { padding: 10px 8px 28px; max-width: 520px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
+main { padding: 10px 8px 32px; max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 8px; }
 
-.login-badge {
-background: var(--surface);
-border: 1px solid var(--line);
-border-radius: 8px;
-padding: 7px 11px;
+.sticky-header {
+position: sticky; top: 0; z-index: 20;
+background: var(--bg);
+padding-top: 10px; padding-bottom: 6px;
+display: flex; flex-direction: column; gap: 8px;
+margin: -10px -8px 0; padding-left: 8px; padding-right: 8px;
+}
+
+.top-bar {
+padding: 4px 2px;
 display: flex;
+justify-content: space-between;
 align-items: center;
-gap: 6px;
+gap: 8px;
 font-size: 12px;
 font-weight: 600;
 color: var(--ink-sub);
 }
-
-/* ---- 共通アコーディオン(details) : 翌日入力用 ---- */
-details.acc {
-background: var(--surface);
-border-radius: var(--radius);
-border: 0.5px solid var(--line);
-overflow: hidden;
-}
-details.acc summary {
-list-style: none;
-cursor: pointer;
-padding: 10px 12px;
-font-size: 12.5px;
-font-weight: 700;
-letter-spacing: .03em;
-color: var(--ink);
-display: flex;
-align-items: center;
-justify-content: space-between;
-user-select: none;
-background: var(--bg);
-}
-details.acc summary::-webkit-details-marker { display: none; }
-details.acc summary::after {
-content: '▾';
-font-size: 11px;
-color: var(--ink-sub);
-transition: transform .15s;
-}
-details.acc[open] summary::after { transform: rotate(180deg); }
-.acc-body { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 6px; }
-
-/* ---- 翌日入力アコーディオン(強調カラー) ---- */
-details.input-acc {
-border: 1.5px solid #3b6fd6;
-background: #eaf1fd;
-}
-details.input-acc summary {
-background: #dbe6fb;
-color: #1d4fae;
+.top-bar .num { color: var(--ink); font-weight: 700; }
+.top-bar .user-name { color: var(--ink-sub); font-weight: 700; white-space: nowrap; }
+.month-select {
+font-size: 13px; font-weight: 700; padding: 8px 10px;
+border-radius: 6px; border: 1px solid var(--line);
+background: var(--surface); color: var(--ink);
+flex: 1 1 auto; max-width: 140px;
 }
 
-/* ---- 日ブロック(当日/翌日 表示エリア) ---- */
-.day-block { display: flex; flex-direction: column; gap: 5px; }
-.day-heading-row {
-display: flex; align-items: center; justify-content: space-between; gap: 6px;
-padding: 0 2px;
+.filter-split { display: flex; gap: 6px; }
+.seg-group {
+flex: 1; display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden;
 }
-.day-heading-text {
-font-size: 12px; font-weight: 700; color: var(--ink);
-display: flex; align-items: center; gap: 5px;
+.seg-btn {
+flex: 1; text-align: center; font-size: 11px; font-weight: 700; padding: 7px 2px;
+background: var(--surface); color: var(--ink-sub); border: none; cursor: pointer;
 white-space: nowrap;
 }
-.day-heading-text .tag {
-font-size: 10px; font-weight: 700; padding: 1px 6px;
-border-radius: 20px; background: var(--line); color: var(--ink-sub);
-}
-.day-block.tomorrow .day-heading-text .tag { background: var(--ink); color: #fff; }
+.seg-btn.active { background: var(--ink); color: #fff; }
+.seg-btn + .seg-btn { border-left: 1px solid var(--line); }
 
-.tab-controls { display: flex; align-items: center; gap: 4px; }
-.tab-btn {
-font-size: 11px; font-weight: 700; padding: 4px 10px;
-border-radius: 20px; border: 1px solid var(--line);
-background: var(--surface); color: var(--ink-sub);
-cursor: pointer; transition: all .12s;
-}
-.tab-btn.active { background: var(--ink); border-color: var(--ink); color: #fff; }
-.toggle-all-btn {
-font-size: 13px; padding: 3px 6px; border-radius: 8px;
-border: 1px solid var(--line); background: var(--surface);
-cursor: pointer; line-height: 1;
+.bulk-check-btn {
+width: 100%; padding: 9px; font-size: 12px; font-weight: 700;
+border-radius: 8px; border: 1px solid var(--line); background: var(--surface);
+color: var(--ink-sub); cursor: pointer;
 }
 
-.acc-panel { display: none; background: var(--surface); border: 0.5px solid var(--line); border-radius: 8px; padding: 8px 9px; }
-.acc-panel.open { display: flex; flex-direction: column; gap: 6px; }
+.day-row-wrap { display: flex; align-items: center; gap: 6px; }
+.day-reset {
+flex: 0 0 auto; width: 28px; height: 28px; border-radius: 50%;
+display: flex; align-items: center; justify-content: center;
+font-size: 14px; border: 1px solid var(--line); background: var(--surface);
+color: var(--ink-sub); cursor: pointer;
+}
+.day-row { display: flex; flex-wrap: nowrap; gap: 5px; overflow-x: auto; padding-bottom: 2px; flex: 1; min-width: 0; }
+.day-chip {
+flex: 0 0 auto; width: 26px; height: 26px; border-radius: 50%;
+display: flex; align-items: center; justify-content: center;
+font-size: 10.5px; font-weight: 700;
+border: 1px solid var(--line); background: var(--surface); color: var(--ink-sub);
+cursor: pointer;
+}
+.day-chip.active { background: var(--ink); border-color: var(--ink); color: #fff; }
 
-/* ---- レコードカード ---- */
-.rec-card {
-background: var(--bg);
-border-radius: 7px;
-padding: 8px 9px;
+.item-list {
+display: flex; flex-direction: column; gap: 6px;
+}
+
+.item-card {
+background: var(--surface);
 border: 0.5px solid var(--line);
-}
-.rec-card .rec-name {
-font-size: 12.5px; font-weight: 700; color: var(--ink);
-margin-bottom: 4px;
-display: flex; align-items: center; justify-content: space-between;
+border-radius: 8px;
+padding: 8px 10px;
+display: flex;
+flex-direction: row;
+align-items: stretch;
 gap: 8px;
 }
-.status-badge {
-font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: 20px;
-white-space: nowrap;
-}
-.status-ok    { background: #e1f8f5; color: var(--ok); }
-.status-wait  { background: #eaeaea; color: var(--ink-sub); }
-.status-alert { background: #fdeaea; color: var(--ng); }
-.rec-grid {
-display: grid;
-grid-template-columns: repeat(2, 1fr);
-gap: 2px 8px;
-font-size: 11px;
-color: var(--ink-sub);
-}
-.rec-grid .k { font-weight: 600; color: var(--ink-sub); }
-.rec-grid .v { color: var(--ink); font-weight: 600; }
-.rec-empty {
-font-size: 12px; color: var(--ink-sub);
-text-align: center; padding: 10px 0;
+.item-card.checked { background: #eef7f6; border-color: #bfe6e2; }
+
+.item-left-col {
+flex: 0 0 28px;
+display: flex; flex-direction: column; justify-content: space-between; align-items: center;
 }
 
-/* ---- フォーム(翌日入力) ---- */
-.card-title {
-font-size: 10.5px; font-weight: 700;
-letter-spacing: .08em; text-transform: uppercase;
-color: var(--ink-sub); margin: 4px 0 2px;
+.item-checkbox {
+width: 18px; height: 18px; flex: 0 0 18px;
+border: 1.5px solid var(--line); border-radius: 5px;
+background: var(--surface);
+display: inline-flex; align-items: center; justify-content: center;
+font-size: 12px; color: transparent;
+cursor: pointer;
+transition: all .1s;
 }
-.field { margin-bottom: 8px; }
-.field:last-child { margin-bottom: 0; }
-label {
-display: block; font-size: 12px; font-weight: 600;
-color: var(--ink-sub); margin-bottom: 4px;
+.item-checkbox.checked { background: var(--ok); border-color: var(--ok); color: #fff; }
+
+.edit-icon-btn {
+flex: 0 0 auto;
+width: 18px; height: 18px; border-radius: 5px;
+display: inline-flex; align-items: center; justify-content: center;
+font-size: 10px; color: var(--ink-sub);
+background: var(--surface); border: 1px solid var(--line); cursor: pointer;
 }
-label .req { color: var(--ng); margin-left: 2px; }
-.inline-label { display: flex; align-items: baseline; gap: 5px; margin-bottom: 4px; }
-.inline-label .main-lbl { font-size: 12px; font-weight: 600; color: var(--ink-sub); white-space: nowrap; }
-.inline-label .sub-lbl { font-size: 10.5px; color: var(--ink-sub); line-height: 1.3; }
 
-input[type="time"], input[type="text"] {
-width: 100%; padding: 9px 10px;
-border: 1.2px solid var(--line); border-radius: 7px;
-font-size: 14px; font-family: inherit; color: var(--ink);
-background: var(--surface); appearance: none; -webkit-appearance: none;
-transition: border-color .15s; outline: none;
+.item-right-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+
+.item-row1 { display: flex; align-items: center; gap: 7px; line-height: 1.3; }
+.item-type {
+font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 20px;
+background: var(--line); color: var(--ink-sub); flex: 0 0 auto;
 }
-input:focus { border-color: var(--accent); }
+.item-row1 .item-project { font-size: 13px; font-weight: 700; color: var(--ink); }
 
-.section-divider { border: none; border-top: 1px solid var(--line); margin: 8px 0; }
+.item-row2 { display: flex; align-items: baseline; gap: 8px; line-height: 1.3; }
+.item-row2 .item-date { font-size: 11px; color: var(--ink-sub); font-weight: 600; }
+.item-row2 .item-name { font-size: 11px; color: var(--ink-sub); font-weight: 600; flex: 1; }
+.item-row2 .item-amount { font-size: 12.5px; font-weight: 700; color: var(--ink); white-space: nowrap; }
 
-.radio-group { display: flex; gap: 6px; }
-.radio-btn { flex: 1; position: relative; }
-.radio-btn input { position: absolute; opacity: 0; width: 0; height: 0; }
-.radio-btn label {
-display: flex; align-items: center; justify-content: center;
-padding: 8px 4px; border: 1.2px solid var(--line); border-radius: 7px;
-font-size: 12px; font-weight: 600; color: var(--ink-sub);
-cursor: pointer; transition: all .15s; margin: 0; background: var(--surface);
+.item-memo { font-size: 11px; color: var(--ink-sub); }
+.item-memo .v { color: var(--ink); font-weight: 600; }
+.item-cols { display: flex; gap: 14px; }
+.item-col { flex: 1; display: flex; flex-direction: column; gap: 1px; font-size: 11px; color: var(--ink-sub); min-width: 0; }
+.item-col .v { color: var(--ink); font-weight: 600; }
+
+.item-card.editing { flex-direction: column; align-items: stretch; }
+.edit-grid {
+display: grid; grid-template-columns: 1fr 1fr; gap: 6px 8px; margin-bottom: 8px;
 }
-.radio-btn input:checked + label { border-color: var(--ink); background: var(--ink); color: #fff; }
-
-.cond-field { display: none; margin-top: 8px; }
-.cond-field.visible { display: block; }
-
-.field-error { font-size: 10.5px; color: var(--ng); margin-top: 3px; display: none; }
-.field-error.visible { display: block; }
-input.has-error { border-color: var(--ng); }
-
-#globalError {
-display: none; background: #fdeaea; border: 1.2px solid var(--ng); border-radius: 7px;
-padding: 8px 10px; font-size: 12px; color: var(--ng); font-weight: 600; margin-bottom: 8px;
+.edit-grid label { font-size: 10px; color: var(--ink-sub); font-weight: 600; display: block; }
+.edit-grid input {
+width: 100%; margin-top: 2px; padding: 6px 7px; font-size: 12px;
+border: 1px solid var(--line); border-radius: 6px; font-family: inherit; color: var(--ink);
 }
-#globalError.visible { display: block; }
-
-#toast {
-display: none; background: #eef7f6; border: 1.2px solid var(--ok); border-radius: 7px;
-padding: 7px 10px; font-size: 11px; color: #1a8f83; font-weight: 700; margin-bottom: 8px;
-text-align: center;
+.edit-actions { display: flex; gap: 6px; }
+.edit-actions button {
+flex: 1; padding: 9px; font-size: 12px; font-weight: 700; border-radius: 7px; cursor: pointer;
 }
-#toast.visible { display: block; }
+.edit-cancel { background: var(--surface); border: 1px solid var(--line); color: var(--ink-sub); }
+.edit-save { background: var(--ink); border: 1px solid var(--ink); color: #fff; }
 
-#submitBtn {
-width: 100%; padding: 11px; background: var(--accent); color: #fff;
-border: none; border-radius: 7px; font-size: 13px; font-weight: 700;
-font-family: inherit; letter-spacing: .03em; cursor: pointer;
-transition: background .15s, opacity .15s; margin-top: 2px;
+.empty-msg {
+grid-column: 1 / -1;
+font-size: 13px; color: var(--ink-sub); text-align: center; padding: 40px 0;
 }
-#submitBtn:active { background: var(--accent-dk); }
-#submitBtn:disabled { opacity: .5; cursor: not-allowed; }
 
 #loadingScreen {
 position: fixed; inset: 0; background: var(--bg);
@@ -244,132 +196,50 @@ border-radius: 50%; animation: spin .7s linear infinite;
 <div class="loading-text">読み込み中…</div>
 </div>
 
-<main>
-<div class="login-badge">
-<span>👤</span>
-<span id="loginName">読み込み中…</span>
+<main id="mainWrap" style="display:none;">
+<div class="sticky-header">
+<div class="top-bar">
+<select class="month-select" id="monthSelect"></select>
+<span>確認状況　<span class="num" id="checkedCount">0</span> / <span id="totalCount">0</span> 件</span>
+<span class="user-name" id="loginName">-</span>
 </div>
 
-<!-- ===== 翌日 入力・編集(ログイン直下) ===== -->
-<details class="acc input-acc" id="tomorrowInputAcc">
-<summary>🌟 <span id="tomorrowInputDateLabel">--/--</span> 入力編集はこちら</summary>
-<div class="acc-body">
-<div id="toast">送信しました！</div>
-<div id="globalError">入力に不備があります。確認してください。</div>
-
-<div class="field">
-<label for="workPlace">勤務場所<span class="req">*</span></label>
-<input type="text" id="workPlace" placeholder="例）ららぽーと甲子園 / 〇〇現場" required>
-<div class="field-error" id="err-workPlace">勤務場所を入力してください</div>
+<div class="filter-split">
+<div class="seg-group" id="checkFilterRow"></div>
+<div class="seg-group" id="typeFilterRow"></div>
 </div>
 
-<hr class="section-divider">
-
-<div class="field">
-<div class="inline-label">
-<span class="main-lbl">出発時間<span class="req">*</span></span>
-<span class="sub-lbl">自宅を出発する時間</span>
-</div>
-<input type="time" id="departureTime" required>
-<div class="field-error" id="err-departureTime">入力してください</div>
+<div class="day-row-wrap">
+<button class="day-reset" id="addItemBtn" title="新規追加" aria-label="新規追加">＋</button>
+<button class="day-reset" id="dayReset" title="全部表示" aria-label="全部表示">↺</button>
+<div class="day-row" id="dayRow"></div>
 </div>
 
-<div class="field">
-<label>移動区分<span class="req">*</span></label>
-<div class="radio-group">
-<div class="radio-btn">
-<input type="radio" name="transportType" id="tr-train" value="電車">
-<label for="tr-train">🚃 電車</label>
-</div>
-<div class="radio-btn">
-<input type="radio" name="transportType" id="tr-pick" value="ピック">
-<label for="tr-pick">🚗 ピック</label>
-</div>
-<div class="radio-btn">
-<input type="radio" name="transportType" id="tr-none" value="なし">
-<label for="tr-none">— なし</label>
-</div>
-</div>
-<div class="field-error" id="err-transportType">移動区分を選択してください</div>
-
-<div class="cond-field" id="cond-train">
-<label for="transportTime">電車出発時間</label>
-<input type="time" id="transportTime">
+<button class="bulk-check-btn" id="bulkCheckBtn">☑ 表示中を全てチェック</button>
 </div>
 
-<div class="cond-field" id="cond-pick">
-<label for="transportTimePick">集合時間</label>
-<input type="time" id="transportTimePick">
-<label for="pickupPlace" style="margin-top:8px">ピック場所</label>
-<input type="text" id="pickupPlace" placeholder="例）大阪駅桜橋口">
+<div class="item-list" id="itemList">
+<div class="empty-msg">読み込み中…</div>
 </div>
-</div>
-
-<div class="field">
-<div class="inline-label">
-<span class="main-lbl">到着時間<span class="req">*</span></span>
-<span class="sub-lbl">現場集合場所への到着予定時間</span>
-</div>
-<input type="time" id="arrivalTime" required>
-<div class="field-error" id="err-arrivalTime">入力してください</div>
-</div>
-
-<button id="submitBtn" type="button">送信する</button>
-</div>
-</details>
-
-<!-- ===== 当日ブロック(表示のみ) ===== -->
-<div class="day-block" id="blockToday">
-<div class="day-heading-row">
-<span class="day-heading-text"><span id="todayDateLabel">--/--</span> 勤務分<span class="tag">当日</span></span>
-<div class="tab-controls">
-<button class="tab-btn active" data-panel="selfTodayPanel">自分</button>
-<button class="tab-btn" data-panel="othersTodayPanel">他人</button>
-<button class="toggle-all-btn" data-group="today" title="全開閉">🔃</button>
-</div>
-</div>
-<div class="acc-panel open" id="selfTodayPanel">
-<div id="selfTodayBody"><div class="rec-empty">読み込み中…</div></div>
-</div>
-<div class="acc-panel" id="othersTodayPanel">
-<div id="othersTodayBody"><div class="rec-empty">読み込み中…</div></div>
-</div>
-</div>
-
-<!-- ===== 翌日ブロック(表示のみ) ===== -->
-<div class="day-block tomorrow" id="blockTomorrow">
-<div class="day-heading-row">
-<span class="day-heading-text">✨ <span id="tomorrowDateLabel">--/--</span> 勤務分<span class="tag">翌日</span></span>
-<div class="tab-controls">
-<button class="tab-btn active" data-panel="selfTomorrowPanel">自分</button>
-<button class="tab-btn" data-panel="othersTomorrowPanel">他人</button>
-<button class="toggle-all-btn" data-group="tomorrow" title="全開閉">🔃</button>
-</div>
-</div>
-<div class="acc-panel open" id="selfTomorrowPanel">
-<div id="selfTomorrowBody"><div class="rec-empty">読み込み中…</div></div>
-</div>
-<div class="acc-panel" id="othersTomorrowPanel">
-<div id="othersTomorrowBody"><div class="rec-empty">読み込み中…</div></div>
-</div>
-</div>
-
 </main>
 
 <script>
-const LIFF_ID = '2010311386-sSwMJRkO';
-const GAS_URL = 'https://script.google.com/macros/s/AKfycby526aLBiPtUEuNll856wQvCI_GTnjlZO8RU8n4ffM7Q7vffa3T8hT0xrWYlAmbKNF1WQ/exec';
+const LIFF_ID = '2010311386-JESD3mi6';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbxbWpg2TTkv7VQI38dNYWMSKZ2uO3ru-1Q1Cjze0UxS4MSF24Ahlt53jOam-XMB51dhWg/exec';
 
-let lineUserId  = '';
+let lineUserId = '';
 let displayName = '';
-let isSubmitting = false;
-let tomorrowWorkDate = '';
+let currentMonth = '';
+let allItems = [];
+let checkFilter = 'all';   // 'all' | 'unchecked' | 'checked'
+let typeFilter  = 'all';   // 'all' | 種別名
+let dayFilter   = new Set(); // 選択中の「日」（空なら全部表示）
+let editingRow  = null; // 現在編集中の行番号
+let addMode     = false; // 新規追加フォームを開いているか
 
 const $ = id => document.getElementById(id);
 const loadingScreen = $('loadingScreen');
-const submitBtn     = $('submitBtn');
-const globalError   = $('globalError');
-const toast         = $('toast');
+const mainWrap       = $('mainWrap');
 
 (async () => {
 try {
@@ -383,245 +253,493 @@ console.error('LIFF init error:', e);
 lineUserId  = 'debug_user';
 displayName = 'デバッグユーザー';
 }
-$('loginName').textContent = displayName + ' としてログイン中';
+$('loginName').textContent = displayName;
 
-// ★修正：toISOString()はUTC基準のため、JST午前9時より前だと1日ズレる不具合があった。
-//   JSTのカレンダー日付を明示的に計算するよう変更。
-function jstDatePlusDays(n) {
-const now = new Date();
-const utcMs = now.getTime() + now.getTimezoneOffset() * 60000; // 端末のローカルタイムゾーンに依存せずUTC msを算出
-const jstMs = utcMs + 9 * 60 * 60000; // JSTのwall-clockをUTC扱いのDateとして作る
-const jstDate = new Date(jstMs);
-jstDate.setUTCDate(jstDate.getUTCDate() + n);
-const y = jstDate.getUTCFullYear();
-const m = String(jstDate.getUTCMonth() + 1).padStart(2, '0');
-const d = String(jstDate.getUTCDate()).padStart(2, '0');
-return `${y}-${m}-${d}`;
-}
-
-tomorrowWorkDate = jstDatePlusDays(1);
-
-setupTabControls();
 await loadView();
 loadingScreen.classList.add('hidden');
+mainWrap.style.display = 'flex';
+mainWrap.style.flexDirection = 'column';
 })();
 
-// ---- タブ / 全開閉ボタンの初期化 ----
-function setupTabControls() {
-document.querySelectorAll('.tab-btn').forEach(btn => {
-btn.addEventListener('click', () => {
-const panel = $(btn.dataset.panel);
-const willOpen = !panel.classList.contains('open');
-panel.classList.toggle('open', willOpen);
-btn.classList.toggle('active', willOpen);
-});
-});
-document.querySelectorAll('.toggle-all-btn').forEach(btn => {
-btn.addEventListener('click', () => {
-const group = btn.dataset.group; // 'today' or 'tomorrow'
-const panels = document.querySelectorAll(`#block${group === 'today' ? 'Today' : 'Tomorrow'} .acc-panel`);
-const tabs   = document.querySelectorAll(`#block${group === 'today' ? 'Today' : 'Tomorrow'} .tab-btn`);
-const allOpen = Array.from(panels).every(p => p.classList.contains('open'));
-panels.forEach(p => p.classList.toggle('open', !allOpen));
-tabs.forEach(t => t.classList.toggle('active', !allOpen));
-});
-});
-}
-
-// ---- データ取得＆描画 ----
-async function loadView() {
+async function loadView(month) {
 try {
-const res  = await fetch(`${GAS_URL}?mode=view&uid=${encodeURIComponent(lineUserId)}`);
+const url = `${GAS_URL}?mode=view&uid=${encodeURIComponent(lineUserId)}` + (month ? `&sheetName=${encodeURIComponent(month)}` : '');
+const res  = await fetch(url);
 const data = await res.json();
+
 if (data.status !== 'ok') {
-console.error('view取得エラー', data);
+$('itemList').innerHTML = '<div class="empty-msg">読み込みに失敗しました</div>';
 return;
 }
 
-$('todayDateLabel').textContent = fmtDateLabel(data.today.date);
-$('tomorrowDateLabel').textContent = fmtDateLabel(data.tomorrow.date);
-$('tomorrowInputDateLabel').textContent = fmtDateLabel(data.tomorrow.date);
+if (!data.hasInvoice) {
+$('monthSelect').innerHTML = '';
+$('checkFilterRow').innerHTML = '';
+$('typeFilterRow').innerHTML = '';
+$('dayRow').innerHTML = '';
+$('itemList').innerHTML = `<div class="empty-msg">${data.reason || 'まだ請求書が用意されていません'}</div>`;
+$('checkedCount').textContent = '0';
+$('totalCount').textContent = '0';
+return;
+}
 
-renderSelf('selfTodayBody', data.today.self);
-renderOthers('othersTodayBody', data.today.others);
-renderSelf('selfTomorrowBody', data.tomorrow.self);
-renderOthers('othersTomorrowBody', data.tomorrow.others);
-
-prefillTomorrowForm(data.tomorrow.self);
-
-// 未入力なら開く、入力済み(編集)なら閉じておく
-$('tomorrowInputAcc').open = !data.tomorrow.self;
+currentMonth = data.selectedMonth;
+allItems = sortByDate(data.items || []);
+dayFilter = new Set();
+renderMonthSelect(data.months, data.selectedMonth);
+renderCheckFilter();
+renderTypeFilter();
+renderDayRow();
+applyFiltersAndRender();
 } catch(err) {
 console.error('loadViewエラー', err);
+$('itemList').innerHTML = '<div class="empty-msg">読み込みに失敗しました</div>';
 }
 }
 
-function fmtDateLabel(dateStr) {
-if (!dateStr) return '--/--';
-const d = new Date(dateStr + 'T00:00:00+09:00');
-const w = ['日','月','火','水','木','金','土'][d.getDay()];
-return `${d.getMonth()+1}/${d.getDate()}(${w})`;
+// 日付「2026/07/01」「6/4」どちらの形式にも対応して {month, day} を取り出す
+function parseDateParts(dateStr) {
+const s = String(dateStr || '');
+let m = s.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})/);
+if (m) return { year: Number(m[1]), month: Number(m[2]), day: Number(m[3]) };
+m = s.match(/^(\d{1,2})\/(\d{1,2})/);
+if (m) return { year: null, month: Number(m[1]), day: Number(m[2]) };
+return null;
 }
 
-function statusClass(disp) {
-if (!disp) return 'status-wait';
-if (disp.indexOf('出発済') >= 0) return 'status-ok';
-if (disp.indexOf('要確認') >= 0) return 'status-alert';
-return 'status-wait';
+function dateSortKey(dateStr) {
+const p = parseDateParts(dateStr);
+if (!p) return 999999;
+return p.month * 100 + p.day;
 }
 
-function transportLabel(r) {
-if (r.transport === '電車') return `🚃 電車${r.transportTime ? '（'+r.transportTime+'）' : ''}`;
-if (r.transport === 'ピック') return `🚗 ピック${r.pickup ? '（'+r.pickup+'）' : ''}`;
-return '— なし';
+function sortByDate(items) {
+return items.slice().sort((a, b) => dateSortKey(a.date) - dateSortKey(b.date));
 }
 
-function recordCardHtml(r, opts) {
-opts = opts || {};
-const badge = (typeof r.dispStatus !== 'undefined')
-? `<span class="status-badge ${statusClass(r.dispStatus)}">${r.dispStatus}</span>`
-: '';
+function renderMonthSelect(months, selected) {
+const select = $('monthSelect');
+select.innerHTML = months.map(m =>
+`<option value="${m}" ${m === selected ? 'selected' : ''}>${m}</option>`
+).join('');
+
+select.onchange = async () => {
+$('itemList').innerHTML = '<div class="empty-msg">読み込み中…</div>';
+await loadView(select.value);
+};
+}
+
+function renderCheckFilter() {
+const options = [
+{ key: 'all', label: 'ALL' },
+{ key: 'unchecked', label: '未□' },
+{ key: 'checked', label: '済✓' },
+];
+$('checkFilterRow').innerHTML = options.map(o =>
+`<button class="seg-btn ${checkFilter === o.key ? 'active' : ''}" data-check="${o.key}">${o.label}</button>`
+).join('');
+
+document.querySelectorAll('[data-check]').forEach(btn => {
+btn.addEventListener('click', () => {
+checkFilter = btn.dataset.check;
+document.querySelectorAll('[data-check]').forEach(b => b.classList.remove('active'));
+btn.classList.add('active');
+dayFilter = new Set();
+renderDayRow();
+applyFiltersAndRender();
+});
+});
+}
+
+function shortTypeLabel(t) {
+if (t === 'その他人件費') return 'その他';
+return t;
+}
+
+function renderTypeFilter() {
+const types = Array.from(new Set(allItems.map(i => i.type).filter(Boolean)));
+const options = ['all', ...types];
+$('typeFilterRow').innerHTML = options.map(t =>
+`<button class="seg-btn ${typeFilter === t ? 'active' : ''}" data-type="${t}">${t === 'all' ? 'ALL' : shortTypeLabel(t)}</button>`
+).join('');
+
+document.querySelectorAll('[data-type]').forEach(btn => {
+btn.addEventListener('click', () => {
+typeFilter = btn.dataset.type;
+document.querySelectorAll('[data-type]').forEach(b => b.classList.remove('active'));
+btn.classList.add('active');
+dayFilter = new Set();
+renderDayRow();
+applyFiltersAndRender();
+});
+});
+}
+
+function getTypeCheckFilteredItems() {
+let items = allItems;
+if (checkFilter === 'unchecked') items = items.filter(i => !i.checked);
+if (checkFilter === 'checked')   items = items.filter(i => i.checked);
+if (typeFilter !== 'all') items = items.filter(i => i.type === typeFilter);
+return items;
+}
+
+function renderDayRow() {
+const source = getTypeCheckFilteredItems();
+const days = Array.from(new Set(
+source.map(i => { const p = parseDateParts(i.date); return p ? p.day : null; }).filter(Boolean)
+)).sort((a, b) => a - b);
+
+$('dayRow').innerHTML = days.map(d =>
+`<span class="day-chip ${dayFilter.has(d) ? 'active' : ''}" data-day="${d}">${d}</span>`
+).join('');
+
+document.querySelectorAll('.day-chip').forEach(chip => {
+chip.addEventListener('click', () => {
+const d = Number(chip.dataset.day);
+if (dayFilter.has(d)) dayFilter.delete(d); else dayFilter.add(d);
+chip.classList.toggle('active');
+applyFiltersAndRender();
+});
+});
+}
+
+$('dayReset').addEventListener('click', () => {
+dayFilter = new Set();
+renderDayRow();
+applyFiltersAndRender();
+});
+
+$('addItemBtn').addEventListener('click', () => {
+addMode = !addMode;
+applyFiltersAndRender();
+});
+
+$('bulkCheckBtn').addEventListener('click', () => bulkCheckVisible());
+
+function getFilteredItems() {
+let items = getTypeCheckFilteredItems();
+if (dayFilter.size > 0) {
+items = items.filter(i => {
+const p = parseDateParts(i.date);
+return p && dayFilter.has(p.day);
+});
+}
+return items;
+}
+
+function applyFiltersAndRender() {
+renderItems(getFilteredItems());
+}
+
+async function bulkCheckVisible() {
+const visible = getFilteredItems().filter(i => !i.checked);
+if (visible.length === 0) return;
+
+visible.forEach(i => { i.checked = true; });
+applyFiltersAndRender();
+
+try {
+await Promise.all(visible.map(i => fetch(GAS_URL, {
+method:   'POST',
+redirect: 'follow',
+headers:  { 'Content-Type': 'text/plain;charset=utf-8' },
+body: JSON.stringify({
+uid: lineUserId,
+sheetName: currentMonth,
+row: i.row,
+checked: true,
+}),
+})));
+} catch(err) {
+console.error('まとめてチェックエラー', err);
+}
+}
+
+function renderItems(items) {
+const list = $('itemList');
+
+const addHtml = addMode ? addCardHtml() : '';
+
+if ((!items || items.length === 0) && !addMode) {
+list.innerHTML = '<div class="empty-msg">該当する明細はありません</div>';
+updateProgress();
+return;
+}
+
+list.innerHTML = addHtml + (items && items.length ? items.map(itemCardHtml).join('') : '');
+updateProgress();
+
+list.querySelectorAll('.item-card:not(.editing)').forEach(card => {
+card.addEventListener('click', () => onToggleItem(card));
+});
+
+list.querySelectorAll('.edit-icon-btn').forEach(btn => {
+btn.addEventListener('click', (ev) => {
+ev.stopPropagation();
+editingRow = btn.dataset.editRow;
+applyFiltersAndRender();
+});
+});
+
+list.querySelectorAll('.edit-cancel').forEach(btn => {
+btn.addEventListener('click', (ev) => {
+ev.stopPropagation();
+editingRow = null;
+applyFiltersAndRender();
+});
+});
+
+list.querySelectorAll('.edit-save').forEach(btn => {
+btn.addEventListener('click', (ev) => {
+ev.stopPropagation();
+saveEdits(btn.dataset.row);
+});
+});
+
+const addCancelBtn = $('addCancelBtn');
+if (addCancelBtn) addCancelBtn.addEventListener('click', (ev) => {
+ev.stopPropagation();
+addMode = false;
+applyFiltersAndRender();
+});
+
+const addSaveBtn = $('addSaveBtn');
+if (addSaveBtn) addSaveBtn.addEventListener('click', (ev) => {
+ev.stopPropagation();
+saveNewItem();
+});
+}
+
+const WEEKDAY_JP = ['日','月','火','水','木','金','土'];
+function pad2(n) { return String(n).padStart(2, '0'); }
+
+function fmtDateWithWeekday(dateStr) {
+const p = parseDateParts(dateStr);
+if (!p) return dateStr || '';
+let year = p.year;
+if (!year && currentMonth) {
+const m = String(currentMonth).match(/^(\d{4})\./);
+if (m) year = Number(m[1]);
+}
+if (!year) return `${pad2(p.month)}/${pad2(p.day)}`;
+const d = new Date(year, p.month - 1, p.day);
+return `${pad2(p.month)}/${pad2(p.day)}(${WEEKDAY_JP[d.getDay()]})`;
+}
+
+function fmtHours(h) {
+if (h === '' || h === null || h === undefined) return '-';
+const n = Number(h);
+if (isNaN(n)) return String(h);
+return n.toFixed(2);
+}
+
+function itemCardHtml(item) {
+if (String(item.row) === String(editingRow)) return editCardHtml(item);
+
 return `
-<div class="rec-card">
-<div class="rec-name"><span>${opts.showName === false ? (r.event || '') : (r.name || '')}</span>${badge}</div>
-<div class="rec-grid">
-${opts.showName === false ? '' : `<span class="k">施策名</span><span class="v">${r.event || '-'}</span>`}
-<span class="k">集合時間</span><span class="v">${r.meetTime || '-'}</span>
-<span class="k">出発予定</span><span class="v">${r.departTime || '-'}</span>
-<span class="k">到着予定</span><span class="v">${r.arriveTime || '-'}</span>
-<span class="k">移動区分</span><span class="v">${transportLabel(r)}</span>
+<div class="item-card ${item.checked ? 'checked' : ''}" data-row="${item.row}" data-checked="${item.checked}">
+<div class="item-left-col">
+<div class="item-checkbox ${item.checked ? 'checked' : ''}">✓</div>
+<button class="edit-icon-btn" data-edit-row="${item.row}">✎</button>
+</div>
+<div class="item-right-col">
+<div class="item-row1">
+<span class="item-type">${item.type || '-'}</span>
+<span class="item-project">${item.project || '-'}</span>
+</div>
+<div class="item-row2">
+<span class="item-date">${fmtDateWithWeekday(item.date)}</span>
+<span class="item-name">${item.name || '-'}</span>
+<span class="item-amount">¥${Number(item.amount).toLocaleString()}</span>
+</div>
+<div class="item-cols">
+<div class="item-col">
+<span>開始：<span class="v">${item.start || '-'}</span></span>
+<span>終了：<span class="v">${item.end || '-'}</span></span>
+<span>稼働：<span class="v">${fmtHours(item.hours)}</span></span>
+</div>
+<div class="item-col">
+<span>ポジション：<span class="v">${item.position || '-'}</span></span>
+<span>数量：<span class="v">${item.qty || '-'}</span></span>
+<span>単価：<span class="v">¥${Number(item.unitPrice).toLocaleString()}</span></span>
+</div>
+</div>
+<div class="item-memo">メモ：<span class="v">${item.memo || '-'}</span></div>
 </div>
 </div>`;
 }
 
-function renderSelf(bodyId, self) {
-$(bodyId).innerHTML = self
-? recordCardHtml(self, { showName: false })
-: '<div class="rec-empty">データがありません</div>';
+function editField(label, field, item) {
+const val = field === 'unitPrice' ? item.unitPrice : (item[field] || '');
+return `<label>${label}<input id="edit-${field}-${item.row}" type="text" value="${String(val).replace(/"/g,'&quot;')}"></label>`;
 }
 
-function renderOthers(bodyId, others) {
-const body = $(bodyId);
-if (!others || others.length === 0) {
-body.innerHTML = '<div class="rec-empty">他のスタッフの情報はありません</div>';
-} else {
-body.innerHTML = others.map(r => recordCardHtml(r)).join('');
-}
-}
-
-// ---- 翌日・入力フォームへ既存データを反映(既に送信済みならそれを表示) ----
-function prefillTomorrowForm(self) {
-if (!self) return;
-$('workPlace').value = self.event || '';
-$('departureTime').value = self.departTime || '';
-$('arrivalTime').value = self.arriveTime || '';
-
-if (self.transport === '電車') {
-$('tr-train').checked = true;
-$('transportTime').value = self.transportTime || '';
-} else if (self.transport === 'ピック') {
-$('tr-pick').checked = true;
-$('transportTimePick').value = self.transportTime || '';
-$('pickupPlace').value = self.pickup || '';
-} else if (self.transport === 'なし') {
-$('tr-none').checked = true;
-}
-updateCondFields();
+function editCardHtml(item) {
+return `
+<div class="item-card editing" data-row="${item.row}">
+<div class="item-body" style="width:100%;">
+<div class="edit-grid">
+${editField('日付','date',item)}
+${editField('種別','type',item)}
+${editField('案件名','project',item)}
+${editField('ポジション','position',item)}
+${editField('担当','name',item)}
+${editField('開始','start',item)}
+${editField('終了','end',item)}
+${editField('稼働','hours',item)}
+${editField('数量','qty',item)}
+${editField('単価','unitPrice',item)}
+</div>
+<div class="edit-grid" style="grid-template-columns:1fr;">
+${editField('メモ','memo',item)}
+</div>
+<div class="edit-actions">
+<button class="edit-cancel" data-row="${item.row}">キャンセル</button>
+<button class="edit-save" data-row="${item.row}">保存する</button>
+</div>
+</div>
+</div>`;
 }
 
-// ---- フォーム制御 ----
-document.querySelectorAll('input[name="transportType"]').forEach(r => {
-r.addEventListener('change', updateCondFields);
+async function saveEdits(row) {
+const item = allItems.find(i => String(i.row) === String(row));
+if (!item) { editingRow = null; applyFiltersAndRender(); return; }
+
+const fields = ['date','type','project','position','name','start','end','hours','qty','unitPrice','memo'];
+const edits = {};
+fields.forEach(f => {
+const el = document.getElementById(`edit-${f}-${row}`);
+if (!el) return;
+const newVal = el.value;
+const oldVal = f === 'unitPrice' ? item.unitPrice : (item[f] ?? '');
+if (String(oldVal ?? '') !== String(newVal)) edits[f] = newVal;
 });
 
-function updateCondFields() {
-const val = getTransportType();
-$('cond-train').classList.toggle('visible', val === '電車');
-if (val !== '電車') $('transportTime').value = '';
-$('cond-pick').classList.toggle('visible', val === 'ピック');
-if (val !== 'ピック') {
-$('transportTimePick').value = '';
-$('pickupPlace').value = '';
-}
-}
+editingRow = null;
 
-function getTransportType() {
-const c = document.querySelector('input[name="transportType"]:checked');
-return c ? c.value : '';
-}
-
-function getTransportTime() {
-const val = getTransportType();
-if (val === '電車')   return $('transportTime').value || '';
-if (val === 'ピック') return $('transportTimePick').value || '';
-return '';
-}
-
-function validate() {
-let ok = true;
-[
-{ id: 'workPlace',     errId: 'err-workPlace',     check: v => v.trim() !== '' },
-{ id: 'departureTime', errId: 'err-departureTime', check: v => v !== '' },
-{ id: 'arrivalTime',   errId: 'err-arrivalTime',   check: v => v !== '' },
-].forEach(({ id, errId, check }) => {
-const el = $(id), err = $(errId);
-const pass = check(el.value);
-el.classList.toggle('has-error', !pass);
-err.classList.toggle('visible', !pass);
-if (!pass) ok = false;
-});
-const noTr = !getTransportType();
-$('err-transportType').classList.toggle('visible', noTr);
-if (noTr) ok = false;
-return ok;
-}
-
-submitBtn.addEventListener('click', async () => {
-if (isSubmitting) return;
-globalError.classList.remove('visible');
-toast.classList.remove('visible');
-
-if (!validate()) {
-globalError.classList.add('visible');
+if (Object.keys(edits).length === 0) {
+applyFiltersAndRender();
 return;
 }
 
-isSubmitting = true;
-submitBtn.disabled = true;
-submitBtn.textContent = '送信中…';
-
-const payload = {
-timestamp:     new Date().toISOString(),
-lineUserId:    lineUserId,
-displayName:   displayName,
-workDate:      tomorrowWorkDate,
-workPlace:     $('workPlace').value.trim(),
-departureTime: $('departureTime').value,
-arrivalTime:   $('arrivalTime').value,
-transportType: getTransportType(),
-transportTime: getTransportTime(),
-pickupPlace:   $('pickupPlace').value.trim() || '',
-};
+Object.assign(item, edits);
+applyFiltersAndRender();
 
 try {
 await fetch(GAS_URL, {
 method:   'POST',
 redirect: 'follow',
 headers:  { 'Content-Type': 'text/plain;charset=utf-8' },
-body:     JSON.stringify(payload),
+body: JSON.stringify({
+uid: lineUserId,
+sheetName: currentMonth,
+row: row,
+action: 'edit',
+edits: edits,
+}),
 });
-toast.classList.add('visible');
-await loadView();
 } catch(err) {
-console.error(err);
-globalError.textContent = '送信に失敗しました。再度お試しください。';
-globalError.classList.add('visible');
-} finally {
-isSubmitting = false;
-submitBtn.disabled = false;
-submitBtn.textContent = '送信する';
+console.error('編集保存エラー', err);
 }
+}
+
+async function onToggleItem(card) {
+const row = card.dataset.row;
+const nextChecked = card.dataset.checked !== 'true';
+
+// 楽観的UI更新（allItemsの状態も同期しておく）
+card.dataset.checked = nextChecked;
+card.classList.toggle('checked', nextChecked);
+card.querySelector('.item-checkbox').classList.toggle('checked', nextChecked);
+const target = allItems.find(i => String(i.row) === String(row));
+if (target) target.checked = nextChecked;
+updateProgress();
+
+try {
+await fetch(GAS_URL, {
+method:   'POST',
+redirect: 'follow',
+headers:  { 'Content-Type': 'text/plain;charset=utf-8' },
+body: JSON.stringify({
+uid: lineUserId,
+sheetName: currentMonth,
+row: row,
+checked: nextChecked,
+}),
 });
+} catch(err) {
+console.error('チェック更新エラー', err);
+// 失敗時はロールバック
+card.dataset.checked = !nextChecked;
+card.classList.toggle('checked', !nextChecked);
+card.querySelector('.item-checkbox').classList.toggle('checked', !nextChecked);
+if (target) target.checked = !nextChecked;
+updateProgress();
+}
+}
+
+function addCardHtml() {
+return `
+<div class="item-card editing" id="addCard">
+<div class="item-body" style="width:100%;">
+<div class="edit-grid">
+<label>日付<input id="new-date" type="text" placeholder="6/4(木)"></label>
+<label>種別<input id="new-type" type="text" placeholder="人件費"></label>
+<label>案件名<input id="new-project" type="text"></label>
+<label>ポジション<input id="new-position" type="text"></label>
+<label>担当<input id="new-name" type="text" value="${displayName || ''}"></label>
+<label>開始<input id="new-start" type="text"></label>
+<label>終了<input id="new-end" type="text"></label>
+<label>稼働<input id="new-hours" type="text"></label>
+<label>数量<input id="new-qty" type="text" value="1"></label>
+<label>単価<input id="new-unitPrice" type="text"></label>
+</div>
+<div class="edit-grid" style="grid-template-columns:1fr;">
+<label>メモ<input id="new-memo" type="text"></label>
+</div>
+<div class="edit-actions">
+<button class="edit-cancel" id="addCancelBtn">キャンセル</button>
+<button class="edit-save" id="addSaveBtn">保存する</button>
+</div>
+</div>
+</div>`;
+}
+
+async function saveNewItem() {
+const fields = ['date','type','project','position','name','start','end','hours','qty','unitPrice','memo'];
+const data = {};
+fields.forEach(f => {
+const el = document.getElementById(`new-${f}`);
+if (el) data[f] = el.value;
+});
+
+addMode = false;
+$('itemList').innerHTML = '<div class="empty-msg">保存中…</div>';
+
+try {
+await fetch(GAS_URL, {
+method:   'POST',
+redirect: 'follow',
+headers:  { 'Content-Type': 'text/plain;charset=utf-8' },
+body: JSON.stringify({
+uid: lineUserId,
+sheetName: currentMonth,
+action: 'add',
+data: data,
+}),
+});
+} catch(err) {
+console.error('新規追加エラー', err);
+}
+
+await loadView(currentMonth);
+}
+
+function updateProgress() {
+const checked = allItems.filter(i => i.checked).length;
+$('checkedCount').textContent = checked;
+$('totalCount').textContent = allItems.length;
+}
 </script>
 </body>
 </html>
