@@ -733,7 +733,10 @@ action: 'edit',
 edits: edits,
 }),
 });
-} catch(err) {
+// ★保存後にサーバーから最新データを取り直す(合計金額など、サーバー側で
+//   再計算された値をLIFF側にも正しく反映するため)
+await loadView(currentMonth);
+} catch (err) {
 console.error('編集保存エラー', err);
 }
 }
