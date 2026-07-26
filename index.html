@@ -727,6 +727,15 @@ return;
 }
 
 Object.assign(item, edits);
+
+// ★楽観的に合計金額も先に再計算して即座に画面へ反映(サーバー確定値は
+//   このあとの再取得で上書きされるので、ズレていてもすぐ直る)
+if (edits.hasOwnProperty('qty') || edits.hasOwnProperty('unitPrice')) {
+const q = Number(item.qty);
+const u = Number(item.unitPrice);
+if (!isNaN(q) && !isNaN(u)) item.amount = q * u;
+}
+
 applyFiltersAndRender();
 
 try {
