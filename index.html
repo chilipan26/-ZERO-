@@ -235,7 +235,7 @@ let displayName = '';
 let currentMonth = '';
 let allItems = [];
 let checkFilter = 'all';   // 'all' | 'unchecked' | 'checked'
-let typeFilter  = 'all';   // 'all' | 種別名
+let typeFilter  = new Set(); // 選択中の種別(空なら全種別を表示)
 let dayFilter   = new Set(); // 選択中の「日」（空なら全部表示）
 let editingRow  = null; // 現在編集中の行番号
 let addMode     = false; // 新規追加フォームを開いているか
@@ -362,16 +362,24 @@ return t;
 
 function renderTypeFilter() {
 const types = Array.from(new Set(allItems.map(i => i.type).filter(Boolean)));
-const options = ['all', ...types];
-$('typeFilterRow').innerHTML = options.map(t =>
-`<button class="seg-btn ${typeFilter === t ? 'active' : ''}" data-type="${t}">${t === 'all' ? 'ALL' : shortTypeLabel(t)}</button>`
+
+let html = `<button class="seg-btn ${typeFilter.size === 0 ? 'active' : ''}" data-type="all">ALL</button>`;
+html += types.map(t =>
+`<button class="seg-btn ${typeFilter.has(t) ? 'active' : ''}" data-type="${t}">${shortTypeLabel(t)}</button>`
 ).join('');
+$('typeFilterRow').innerHTML = html;
 
 document.querySelectorAll('[data-type]').forEach(btn => {
 btn.addEventListener('click', () => {
-typeFilter = btn.dataset.type;
-document.querySelectorAll('[data-type]').forEach(b => b.classList.remove('active'));
-btn.classList.add('active');
+const t = btn.dataset.type;
+if (t === 'all') {
+typeFilter = new Set();
+} else if (typeFilter.has(t)) {
+typeFilter.delete(t);
+} else {
+typeFilter.add(t);
+}
+renderTypeFilter();
 dayFilter = new Set();
 renderDayRow();
 applyFiltersAndRender();
@@ -383,7 +391,7 @@ function getTypeCheckFilteredItems() {
 let items = allItems;
 if (checkFilter === 'unchecked') items = items.filter(i => !i.checked);
 if (checkFilter === 'checked')   items = items.filter(i => i.checked);
-if (typeFilter !== 'all') items = items.filter(i => i.type === typeFilter);
+if (typeFilter.size > 0) items = items.filter(i => typeFilter.has(i.type));
 return items;
 }
 
