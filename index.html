@@ -158,10 +158,13 @@ background: var(--line); color: var(--ink-sub); flex: 0 0 auto;
 display: grid; grid-template-columns: 1fr 1fr; gap: 6px 8px; margin-bottom: 8px;
 }
 .edit-grid label { font-size: 10px; color: var(--ink-sub); font-weight: 600; display: block; }
-.edit-grid input {
+.edit-grid input, .edit-grid select {
 width: 100%; margin-top: 2px; padding: 6px 7px; font-size: 12px;
 border: 1px solid var(--line); border-radius: 6px; font-family: inherit; color: var(--ink);
+background: var(--surface); appearance: auto;
 }
+.edit-grid input[readonly] { background: var(--bg); color: var(--ink-sub); }
+.edit-grid select:disabled { color: var(--ink-sub); background: var(--bg); }
 .edit-actions { display: flex; gap: 6px; }
 .edit-actions button {
 flex: 1; padding: 9px; font-size: 12px; font-weight: 700; border-radius: 7px; cursor: pointer;
@@ -508,6 +511,9 @@ if (addSaveBtn) addSaveBtn.addEventListener('click', (ev) => {
 ev.stopPropagation();
 saveNewItem();
 });
+
+if (addMode) setupAddFormListeners();
+if (editingRow) setupEditFormListeners(editingRow);
 }
 
 const WEEKDAY_JP = ['日','月','火','水','木','金','土'];
@@ -569,50 +575,139 @@ return `
 </div>`;
 }
 
-function editField(label, field, item) {
-const val = field === 'unitPrice' ? item.unitPrice : (item[field] || '');
-return `<label>${label}<input id="edit-${field}-${item.row}" type="text" value="${String(val).replace(/"/g,'&quot;')}"></label>`;
+function isTimeLike(v) {
+return /^\d{1,2}:\d{2}$/.test(String(v || '').trim());
 }
 
 function editCardHtml(item) {
+const row = item.row;
+const dateVal = toDateInputValue(item.date);
+const priceVal = item.unitPrice ? '¥' + Number(item.unitPrice).toLocaleString() : '';
+const startIsTime = isTimeLike(item.start);
+const endIsTime = isTimeLike(item.end);
+const hoursAuto = startIsTime && endIsTime;
+
 return `
-<div class="item-card editing" data-row="${item.row}">
+<div class="item-card editing" data-row="${row}">
 <div class="item-body" style="width:100%;">
 <div class="edit-grid">
-${editField('日付','date',item)}
-${editField('種別','type',item)}
-${editField('案件名','project',item)}
-${editField('ポジション','position',item)}
-${editField('担当','name',item)}
-${editField('開始','start',item)}
-${editField('終了','end',item)}
-${editField('稼働','hours',item)}
-${editField('数量','qty',item)}
-${editField('単価','unitPrice',item)}
+<label>日付<input id="edit-date-${row}" type="date" value="${dateVal}"></label>
+<label>種別<select id="edit-type-${row}">
+${['人件費','その他人件費','手当','立替費','★人材管理費'].map(t =>
+`<option value="${t}" ${item.type === t ? 'selected' : ''}>${t}</option>`
+).join('')}
+</select></label>
+<label style="grid-column:1/-1;">案件名<select id="edit-project-${row}">
+<option value="${item.project || ''}" selected>${item.project || '(未設定)'}</option>
+</select></label>
+<label>ポジション<input id="edit-position-${row}" type="text" value="${esc(item.position)}"></label>
+<label>担当<input id="edit-name-${row}" type="text" value="${esc(item.name)}"></label>
+<label>開始${startIsTime ? '' : '(時間形式以外)'}<input id="edit-start-${row}" type="${startIsTime ? 'time' : 'text'}" value="${esc(item.start)}"></label>
+<label>終了${endIsTime ? '' : '(時間形式以外)'}<input id="edit-end-${row}" type="${endIsTime ? 'time' : 'text'}" value="${esc(item.end)}"></label>
+<label>稼働${hoursAuto ? '(自動計算)' : ''}<input id="edit-hours-${row}" type="text" value="${esc(fmtHours(item.hours))}" ${hoursAuto ? 'readonly' : ''}></label>
+<label>数量<input id="edit-qty-${row}" type="text" value="${esc(item.qty)}"></label>
+<label>単価<input id="edit-unitPrice-${row}" type="text" value="${priceVal}" inputmode="numeric"></label>
 </div>
 <div class="edit-grid" style="grid-template-columns:1fr;">
-${editField('メモ','memo',item)}
+<label>メモ<input id="edit-memo-${row}" type="text" value="${esc(item.memo)}"></label>
 </div>
 <div class="edit-actions">
-<button class="edit-cancel" data-row="${item.row}">キャンセル</button>
-<button class="edit-save" data-row="${item.row}">保存する</button>
+<button class="edit-cancel" data-row="${row}">キャンセル</button>
+<button class="edit-save" data-row="${row}">保存する</button>
 </div>
 </div>
 </div>`;
+}
+
+function esc(v) {
+return String(v ?? '').replace(/"/g, '&quot;');
+}
+
+// 保存済みの日付("M/D(曜)"や"yyyy/MM/dd")を <input type=date> 用の "yyyy-MM-dd" に変換
+function toDateInputValue(dateStr) {
+const p = parseDateParts(dateStr);
+if (!p) return '';
+let year = p.year;
+if (!year && currentMonth) {
+const m = String(currentMonth).match(/^(\d{4})\./);
+if (m) year = Number(m[1]);
+}
+if (!year) return '';
+return `${year}-${pad2(p.month)}-${pad2(p.day)}`;
+}
+
+// ---- 編集フォームの補助ロジック(新規追加フォームと同じ挙動) ----
+function setupEditFormListeners(row) {
+const dateEl = $(`edit-date-${row}`);
+if (dateEl) dateEl.addEventListener('change', () => onEditDateChange(row));
+
+const startEl = $(`edit-start-${row}`), endEl = $(`edit-end-${row}`);
+if (startEl) startEl.addEventListener('change', () => updateEditAutoHours(row));
+if (endEl) endEl.addEventListener('change', () => updateEditAutoHours(row));
+
+const priceEl = $(`edit-unitPrice-${row}`);
+if (priceEl) priceEl.addEventListener('input', formatCurrencyInput);
+}
+
+async function onEditDateChange(row) {
+const dateEl = $(`edit-date-${row}`);
+const projectEl = $(`edit-project-${row}`);
+if (!dateEl || !projectEl || !dateEl.value) return;
+
+const currentValue = projectEl.value;
+projectEl.disabled = true;
+projectEl.innerHTML = '<option value="">読み込み中…</option>';
+
+try {
+const res = await fetch(`${GAS_URL}?mode=projects&date=${encodeURIComponent(dateEl.value)}`);
+const data = await res.json();
+const projects = data.projects || [];
+if (currentValue && projects.indexOf(currentValue) === -1) projects.unshift(currentValue);
+if (projects.length === 0) {
+projectEl.innerHTML = '<option value="">この日の案件が見つかりません</option>';
+} else {
+projectEl.innerHTML = projects.map(p =>
+`<option value="${p}" ${p === currentValue ? 'selected' : ''}>${p}</option>`
+).join('');
+}
+} catch (err) {
+console.error('案件取得エラー', err);
+}
+projectEl.disabled = false;
+}
+
+function updateEditAutoHours(row) {
+const startEl = $(`edit-start-${row}`), endEl = $(`edit-end-${row}`), hoursEl = $(`edit-hours-${row}`);
+if (!startEl || !endEl || !hoursEl) return;
+if (!isTimeLike(startEl.value) || !isTimeLike(endEl.value)) return; // 時間形式でなければ自動計算しない
+
+const [sh, sm] = startEl.value.split(':').map(Number);
+const [eh, em] = endEl.value.split(':').map(Number);
+let diffMin = (eh * 60 + em) - (sh * 60 + sm);
+if (diffMin < 0) diffMin += 24 * 60;
+hoursEl.value = (diffMin / 60).toFixed(2);
 }
 
 async function saveEdits(row) {
 const item = allItems.find(i => String(i.row) === String(row));
 if (!item) { editingRow = null; applyFiltersAndRender(); return; }
 
-const fields = ['date','type','project','position','name','start','end','hours','qty','unitPrice','memo'];
+const dateEl = $(`edit-date-${row}`);
+const newDate = dateEl && dateEl.value ? toSheetDateStr(dateEl.value) : item.date;
+
+const priceEl = $(`edit-unitPrice-${row}`);
+const newPrice = priceEl ? priceEl.value.replace(/[^\d]/g, '') : item.unitPrice;
+
+const rawFields = { date: newDate, unitPrice: newPrice };
+['type', 'project', 'position', 'name', 'start', 'end', 'hours', 'qty', 'memo'].forEach(f => {
+const el = $(`edit-${f}-${row}`);
+if (el) rawFields[f] = el.value;
+});
+
 const edits = {};
-fields.forEach(f => {
-const el = document.getElementById(`edit-${f}-${row}`);
-if (!el) return;
-const newVal = el.value;
+Object.keys(rawFields).forEach(f => {
 const oldVal = f === 'unitPrice' ? item.unitPrice : (item[f] ?? '');
-if (String(oldVal ?? '') !== String(newVal)) edits[f] = newVal;
+if (String(oldVal ?? '') !== String(rawFields[f])) edits[f] = rawFields[f];
 });
 
 editingRow = null;
@@ -683,19 +778,25 @@ return `
 <div class="item-card editing" id="addCard">
 <div class="item-body" style="width:100%;">
 <div class="edit-grid">
-<label>日付<input id="new-date" type="text" placeholder="6/4(木)"></label>
-<label>種別<input id="new-type" type="text" placeholder="人件費"></label>
-<label>案件名<input id="new-project" type="text"></label>
+<label>日付<input id="new-date" type="date"></label>
+<label>種別<select id="new-type">
+<option value="人件費">人件費</option>
+<option value="その他人件費">その他人件費</option>
+<option value="手当">手当</option>
+<option value="立替費">立替費</option>
+<option value="★人材管理費">★人材管理費</option>
+</select></label>
+<label style="grid-column:1/-1;">案件名<select id="new-project" disabled><option value="">日付を選ぶと案件が表示されます</option></select></label>
 <label>ポジション<input id="new-position" type="text"></label>
 <label>担当<input id="new-name" type="text" value="${displayName || ''}"></label>
-<label>開始<input id="new-start" type="text"></label>
-<label>終了<input id="new-end" type="text"></label>
-<label>稼働<input id="new-hours" type="text"></label>
+<label>開始<input id="new-start" type="time"></label>
+<label>終了<input id="new-end" type="time"></label>
+<label>稼働(自動計算)<input id="new-hours" type="text" placeholder="開始・終了から自動計算" readonly></label>
 <label>数量<input id="new-qty" type="text" value="1"></label>
-<label>単価<input id="new-unitPrice" type="text"></label>
+<label>単価<input id="new-unitPrice" type="text" placeholder="¥0" inputmode="numeric"></label>
 </div>
 <div class="edit-grid" style="grid-template-columns:1fr;">
-<label>メモ<input id="new-memo" type="text"></label>
+<label>メモ(検索用キーワード・任意)<input id="new-memoKeyword" type="text" placeholder="例：ST"></label>
 </div>
 <div class="edit-actions">
 <button class="edit-cancel" id="addCancelBtn">キャンセル</button>
@@ -705,13 +806,100 @@ return `
 </div>`;
 }
 
+// ---- 新規追加フォームの補助ロジック ----
+function setupAddFormListeners() {
+const dateEl = $('new-date');
+if (dateEl) dateEl.addEventListener('change', onAddDateChange);
+
+const startEl = $('new-start'), endEl = $('new-end');
+if (startEl) startEl.addEventListener('change', updateAutoHours);
+if (endEl) endEl.addEventListener('change', updateAutoHours);
+
+const priceEl = $('new-unitPrice');
+if (priceEl) priceEl.addEventListener('input', formatCurrencyInput);
+}
+
+// 日付を選ぶと、クベーラ(全国版JT)からその日の案件名を取得してプルダウンに反映
+async function onAddDateChange() {
+const dateEl = $('new-date');
+const projectEl = $('new-project');
+if (!dateEl || !projectEl || !dateEl.value) return;
+
+projectEl.disabled = true;
+projectEl.innerHTML = '<option value="">読み込み中…</option>';
+
+try {
+const res = await fetch(`${GAS_URL}?mode=projects&date=${encodeURIComponent(dateEl.value)}`);
+const data = await res.json();
+const projects = data.projects || [];
+if (projects.length === 0) {
+projectEl.innerHTML = '<option value="">この日の案件が見つかりません</option>';
+} else {
+projectEl.innerHTML = '<option value="">選択してください</option>' +
+projects.map(p => `<option value="${p}">${p}</option>`).join('');
+}
+} catch (err) {
+console.error('案件取得エラー', err);
+projectEl.innerHTML = '<option value="">取得に失敗しました</option>';
+}
+projectEl.disabled = false;
+}
+
+// 開始・終了時間から稼働時間を自動計算(HH:mm差分 → 小数)
+function updateAutoHours() {
+const startEl = $('new-start'), endEl = $('new-end'), hoursEl = $('new-hours');
+if (!startEl || !endEl || !hoursEl) return;
+if (!startEl.value || !endEl.value) { hoursEl.value = ''; return; }
+
+const [sh, sm] = startEl.value.split(':').map(Number);
+const [eh, em] = endEl.value.split(':').map(Number);
+let diffMin = (eh * 60 + em) - (sh * 60 + sm);
+if (diffMin < 0) diffMin += 24 * 60; // 日をまたぐケース
+hoursEl.value = (diffMin / 60).toFixed(2);
+}
+
+// 単価入力を ¥00,000 形式に整形
+function formatCurrencyInput(ev) {
+const el = ev.target;
+const digits = el.value.replace(/[^\d]/g, '');
+el.value = digits ? '¥' + Number(digits).toLocaleString() : '';
+}
+
+// メモ = 手入力キーワード + 選択した案件名(自動反映)
+function buildAutoMemo() {
+const keywordEl = $('new-memoKeyword');
+const projectEl = $('new-project');
+const parts = [];
+if (keywordEl && keywordEl.value.trim()) parts.push(keywordEl.value.trim());
+if (projectEl && projectEl.value) parts.push(projectEl.value);
+return parts.join(' ');
+}
+
+// "yyyy-MM-dd" → "M/D(曜)" 形式(シート上の既存表記に合わせる)
+function toSheetDateStr(yyyyMMdd) {
+if (!yyyyMMdd) return '';
+const [y, m, d] = yyyyMMdd.split('-').map(Number);
+const dt = new Date(y, m - 1, d);
+return `${m}/${d}(${WEEKDAY_JP[dt.getDay()]})`;
+}
+
 async function saveNewItem() {
-const fields = ['date','type','project','position','name','start','end','hours','qty','unitPrice','memo'];
-const data = {};
-fields.forEach(f => {
-const el = document.getElementById(`new-${f}`);
-if (el) data[f] = el.value;
-});
+const dateVal = $('new-date') ? $('new-date').value : '';
+const unitPriceRaw = $('new-unitPrice') ? $('new-unitPrice').value.replace(/[^\d]/g, '') : '';
+
+const data = {
+date:      toSheetDateStr(dateVal),
+type:      $('new-type')     ? $('new-type').value     : '',
+project:   $('new-project')  ? $('new-project').value  : '',
+position:  $('new-position') ? $('new-position').value : '',
+name:      $('new-name')     ? $('new-name').value     : '',
+start:     $('new-start')    ? $('new-start').value    : '',
+end:       $('new-end')      ? $('new-end').value      : '',
+hours:     $('new-hours')    ? $('new-hours').value    : '',
+qty:       $('new-qty')      ? $('new-qty').value      : '',
+unitPrice: unitPriceRaw,
+memo:      buildAutoMemo(),
+};
 
 addMode = false;
 $('itemList').innerHTML = '<div class="empty-msg">保存中…</div>';
