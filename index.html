@@ -266,8 +266,9 @@ mainWrap.style.flexDirection = 'column';
 
 async function loadView(month) {
 try {
-const url = `${GAS_URL}?mode=view&uid=${encodeURIComponent(lineUserId)}` + (month ? `&sheetName=${encodeURIComponent(month)}` : '');
-const res  = await fetch(url);
+const cacheBust = `&_=${Date.now()}`;
+const url = `${GAS_URL}?mode=view&uid=${encodeURIComponent(lineUserId)}` + (month ? `&sheetName=${encodeURIComponent(month)}` : '') + cacheBust;
+const res  = await fetch(url, { cache: 'no-store' });
 const data = await res.json();
 
 if (data.status !== 'ok') {
@@ -659,7 +660,7 @@ projectEl.disabled = true;
 projectEl.innerHTML = '<option value="">読み込み中…</option>';
 
 try {
-const res = await fetch(`${GAS_URL}?mode=projects&date=${encodeURIComponent(dateEl.value)}`);
+const res = await fetch(`${GAS_URL}?mode=projects&date=${encodeURIComponent(dateEl.value)}&_=${Date.now()}`, { cache: 'no-store' });
 const data = await res.json();
 const projects = data.projects || [];
 if (currentValue && projects.indexOf(currentValue) === -1) projects.unshift(currentValue);
@@ -832,7 +833,7 @@ projectEl.disabled = true;
 projectEl.innerHTML = '<option value="">読み込み中…</option>';
 
 try {
-const res = await fetch(`${GAS_URL}?mode=projects&date=${encodeURIComponent(dateEl.value)}`);
+const res = await fetch(`${GAS_URL}?mode=projects&date=${encodeURIComponent(dateEl.value)}&_=${Date.now()}`, { cache: 'no-store' });
 const data = await res.json();
 const projects = data.projects || [];
 if (projects.length === 0) {
